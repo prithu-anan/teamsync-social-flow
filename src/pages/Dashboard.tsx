@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -357,7 +356,9 @@ const Dashboard = () => {
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Badge variant="success">Completed</Badge>
+                        <Badge variant="secondary" className="bg-green-100 text-green-800">
+                          Completed
+                        </Badge>
                         <Avatar className="h-6 w-6">
                           <AvatarImage
                             src={task.assignee.avatar}

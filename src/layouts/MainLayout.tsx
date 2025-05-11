@@ -27,8 +27,8 @@ const MainLayout = () => {
 
   return (
     <SidebarProvider
-      defaultCollapsed={isMobile}
-      collapsedWidth={isMobile ? 0 : 80}
+      defaultOpen={!isMobile}
+      open={isMobile ? false : undefined}
     >
       <div className="flex min-h-screen w-full">
         <AppSidebar />

@@ -27,7 +27,8 @@ import TeamSyncLogo from "@/components/TeamSyncLogo";
 
 const AppSidebar = () => {
   const location = useLocation();
-  const { collapsed } = useSidebar();
+  const sidebar = useSidebar();
+  const isCollapsed = sidebar.state === "collapsed";
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -76,12 +77,12 @@ const AppSidebar = () => {
     <Sidebar
       className={cn(
         "border-r border-sidebar-border bg-sidebar",
-        collapsed ? "w-20" : "w-64"
+        isCollapsed ? "w-20" : "w-64"
       )}
-      collapsible
+      collapsible="icon"
     >
       <div className="flex items-center h-16 px-4 border-b border-sidebar-border">
-        {!collapsed ? (
+        {!isCollapsed ? (
           <div className="flex items-center">
             <TeamSyncLogo className="h-6 w-6 text-teamsync-400" />
             <span className="ml-2 text-xl font-bold text-sidebar-foreground">
@@ -94,7 +95,7 @@ const AppSidebar = () => {
         <SidebarTrigger
           className={cn(
             "ml-auto h-8 w-8 text-sidebar-foreground hover:text-sidebar-foreground/80",
-            collapsed && "justify-center"
+            isCollapsed && "justify-center"
           )}
         />
       </div>
@@ -102,7 +103,7 @@ const AppSidebar = () => {
       <SidebarContent className="p-2">
         {navItems.map((section) => (
           <SidebarGroup key={section.label}>
-            {!collapsed && (
+            {!isCollapsed && (
               <SidebarGroupLabel className="text-xs font-medium text-sidebar-foreground/70 px-3 py-2">
                 {section.label}
               </SidebarGroupLabel>
@@ -117,10 +118,10 @@ const AppSidebar = () => {
                         <item.icon
                           className={cn(
                             "h-5 w-5",
-                            collapsed && "h-6 w-6 mx-auto"
+                            isCollapsed && "h-6 w-6 mx-auto"
                           )}
                         />
-                        {!collapsed && <span>{item.title}</span>}
+                        {!isCollapsed && <span>{item.title}</span>}
                       </NavLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -137,24 +138,24 @@ const AppSidebar = () => {
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <NavLink to="/messages" className={getLinkClass}>
-                <MessageCircle className={cn("h-5 w-5", collapsed && "h-6 w-6 mx-auto")} />
-                {!collapsed && <span>Messages</span>}
+                <MessageCircle className={cn("h-5 w-5", isCollapsed && "h-6 w-6 mx-auto")} />
+                {!isCollapsed && <span>Messages</span>}
               </NavLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <NavLink to="/notifications" className={getLinkClass}>
-                <Bell className={cn("h-5 w-5", collapsed && "h-6 w-6 mx-auto")} />
-                {!collapsed && <span>Notifications</span>}
+                <Bell className={cn("h-5 w-5", isCollapsed && "h-6 w-6 mx-auto")} />
+                {!isCollapsed && <span>Notifications</span>}
               </NavLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <NavLink to="/settings" className={getLinkClass}>
-                <Settings className={cn("h-5 w-5", collapsed && "h-6 w-6 mx-auto")} />
-                {!collapsed && <span>Settings</span>}
+                <Settings className={cn("h-5 w-5", isCollapsed && "h-6 w-6 mx-auto")} />
+                {!isCollapsed && <span>Settings</span>}
               </NavLink>
             </SidebarMenuButton>
           </SidebarMenuItem>

@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Calendar as CalendarIcon, Plus, Users, Filter } from "lucide-react";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -21,6 +20,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { DayContentProps } from "react-day-picker";
 
 interface CalendarEvent {
   id: string;
@@ -169,6 +169,19 @@ const CalendarPage = () => {
     });
   };
 
+  // Custom day content component
+  const CustomDayContent = (props: DayContentProps) => {
+    const { date, activeModifiers } = props;
+    return (
+      <div className="relative h-9 w-9 p-0 flex items-center justify-center">
+        <span>{date.getDate()}</span>
+        {isDayWithEvent(date) && (
+          <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-teamsync-500 rounded-full" />
+        )}
+      </div>
+    );
+  };
+
   return (
     <div>
       {/* Header section */}
@@ -226,14 +239,7 @@ const CalendarPage = () => {
                 withEvents: "!bg-teamsync-50 font-semibold",
               }}
               components={{
-                DayContent: ({ day }) => (
-                  <div className="relative h-9 w-9 p-0 flex items-center justify-center">
-                    <span>{day.day}</span>
-                    {isDayWithEvent(day.date) && (
-                      <div className="absolute bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-teamsync-500 rounded-full" />
-                    )}
-                  </div>
-                ),
+                DayContent: CustomDayContent
               }}
             />
           </CardContent>
