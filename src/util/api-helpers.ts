@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://localhost:8080';
+const API_BASE_URL = 'http://localhost:8080';
 
 export const signup = async (req) => {
     try {
@@ -39,3 +39,22 @@ export const login = async (req) => {
         }
     }
 }; 
+
+export const getTasks = async () => {
+    try {
+        const res = await axios.get(`${API_BASE_URL}/api/tasks`);
+
+        if (res.status === 200) {
+            return res.data;
+        }
+
+    } catch (err) {
+        if (err.response) {
+            return { error: err.response.data || "Failed to fetch tasks" };
+        } else if (err.request) {
+            return { error: "No response from server. Check your connection." };
+        } else {
+            return { error: "An unexpected error occurred." };
+        }
+    }
+}

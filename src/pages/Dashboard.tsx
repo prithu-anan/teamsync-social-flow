@@ -182,7 +182,7 @@ const Dashboard = () => {
       <section className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
-            Welcome back, {user?.name.split(" ")[0]}!
+            Welcome back, {(user?.name?.split(" ")[0]) ?? "Sadat"}!
           </h1>
           <p className="text-muted-foreground">
             Here's what's happening with your projects today.

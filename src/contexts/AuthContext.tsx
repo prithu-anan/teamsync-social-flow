@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import { toast } from "@/components/ui/use-toast";
+import { login as loginApi, signup as signupApi } from "@/util/api-helpers";
 
 interface User {
   id: string;
@@ -46,72 +47,68 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isAuthenticated = user !== null;
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const foundUser = demoUsers.find(
-          (u) => u.email === email && u.password === password
-        );
+    const res = await loginApi({ email, password });
 
-        if (foundUser) {
-          const { password: _, ...userWithoutPassword } = foundUser;
-          setUser(userWithoutPassword);
-          localStorage.setItem(
-            "teamsync_user",
-            JSON.stringify(userWithoutPassword)
-          );
-          toast({
-            title: "Login successful",
-            description: `Welcome back, ${foundUser.name}!`,
-          });
-          resolve(true);
-        } else {
-          toast({
-            title: "Login failed",
-            description: "Invalid email or password",
-            variant: "destructive",
-          });
-          resolve(false);
-        }
-      }, 1000);
+    if (res.error) {
+      toast({
+        title: "Login failed",
+        description: res.error,
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    const userWithoutPassword = {
+      id: res.id,
+      name: res.name,
+      email: res.email,
+      avatar: res.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(res.name)}`,
+    };
+
+    setUser(userWithoutPassword);
+    localStorage.setItem("teamsync_user", JSON.stringify(userWithoutPassword));
+
+    toast({
+      title: "Login successful",
+      description: `Welcome back, ${res.name}!`,
     });
+
+    return true;
   };
+
 
   const signup = async (
     name: string,
     email: string,
     password: string
   ): Promise<boolean> => {
-    // Simulate API call
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        if (demoUsers.some((u) => u.email === email)) {
-          toast({
-            title: "Signup failed",
-            description: "Email already in use",
-            variant: "destructive",
-          });
-          resolve(false);
-        } else {
-          // In a real app, we would create a new user in the database
-          const newUser = {
-            id: (demoUsers.length + 1).toString(),
-            name,
-            email,
-            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(
-              name
-            )}&background=0D8ABC&color=fff`,
-          };
-          setUser(newUser);
-          localStorage.setItem("teamsync_user", JSON.stringify(newUser));
-          toast({
-            title: "Account created",
-            description: `Welcome to TeamSync, ${name}!`,
-          });
-          resolve(true);
-        }
-      }, 1000);
+    const res = await signupApi({ name, email, password });
+
+    if (res.error) {
+      toast({
+        title: "Signup failed",
+        description: res.error,
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    const newUser = {
+      id: res.id,
+      name,
+      email,
+      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff`,
+    };
+
+    setUser(newUser);
+    localStorage.setItem("teamsync_user", JSON.stringify(newUser));
+
+    toast({
+      title: "Account created",
+      description: `Welcome to TeamSync, ${name}!`,
     });
+
+    return true;
   };
 
   const logout = () => {
