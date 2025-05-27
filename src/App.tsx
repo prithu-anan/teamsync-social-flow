@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import KanbanBoard from "./pages/KanbanBoard";
 import SocialFeed from "./pages/SocialFeed";
 import Calendar from "./pages/Calendar";
+import Messages from "./pages/Messages";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
@@ -31,6 +32,7 @@ const App = () => (
               <Route path="kanban" element={<KanbanBoard />} />
               <Route path="social" element={<SocialFeed />} />
               <Route path="calendar" element={<Calendar />} />
+              <Route path="messages" element={<Messages />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
