@@ -4,6 +4,7 @@ import { Search, Hash, Users, Plus, Settings } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import ChannelSidebar from "@/components/messages/ChannelSidebar";
 import MessageThread from "@/components/messages/MessageThread";
 import { Badge } from "@/components/ui/badge";
@@ -147,9 +148,10 @@ const Messages = () => {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-background">
-      {/* Channel Sidebar */}
+      {/* Channel Sidebar - Fixed height with internal scrolling */}
       <div className="w-80 border-r border-border bg-slate-50 dark:bg-slate-900 flex flex-col">
-        <div className="p-4 border-b border-border bg-background">
+        {/* Fixed header */}
+        <div className="p-4 border-b border-border bg-background flex-shrink-0">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Messages</h2>
             <Button variant="ghost" size="icon">
@@ -176,21 +178,21 @@ const Messages = () => {
         </div>
         
         {/* Scrollable conversation list */}
-        <div className="flex-1 overflow-y-auto">
+        <ScrollArea className="flex-1">
           <ChannelSidebar 
             channels={filteredChannels} 
             selectedChannel={selectedChannel}
             onChannelSelect={setSelectedChannel}
             searchQuery=""
           />
-        </div>
+        </ScrollArea>
       </div>
 
-      {/* Main Content - Scrollable message area */}
-      <div className="flex-1 flex flex-col">
+      {/* Main Content - Fixed height with internal scrolling */}
+      <div className="flex-1 flex flex-col h-full">
         {selectedChannel ? (
           <>
-            {/* Channel Header */}
+            {/* Channel Header - Fixed */}
             <div className="h-16 border-b border-border bg-background flex items-center justify-between px-6 flex-shrink-0">
               <div className="flex items-center gap-3">
                 {selectedChannel.type === 'channel' ? (
@@ -219,8 +221,10 @@ const Messages = () => {
               </div>
             </div>
 
-            {/* Messages - This will be scrollable */}
-            <MessageThread messages={messages} channel={selectedChannel} />
+            {/* Messages - Scrollable content */}
+            <div className="flex-1 min-h-0">
+              <MessageThread messages={messages} channel={selectedChannel} />
+            </div>
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-center">

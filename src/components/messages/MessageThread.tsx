@@ -4,6 +4,7 @@ import { Send, Plus, Smile, Image, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import MessageItem from "./MessageItem";
 import type { Message, Channel } from "@/pages/Messages";
 
@@ -45,20 +46,22 @@ const MessageThread = ({ messages, channel }: MessageThreadProps) => {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-6">
-        {channelMessages.map((message) => (
-          <MessageItem
-            key={message.id}
-            message={message}
-            onReply={setReplyingTo}
-          />
-        ))}
-        <div ref={messagesEndRef} />
-      </div>
+      {/* Messages Area - Scrollable */}
+      <ScrollArea className="flex-1">
+        <div className="p-6 space-y-6">
+          {channelMessages.map((message) => (
+            <MessageItem
+              key={message.id}
+              message={message}
+              onReply={setReplyingTo}
+            />
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
+      </ScrollArea>
 
-      {/* Message Input */}
-      <div className="border-t border-border bg-background p-4">
+      {/* Message Input - Fixed at bottom */}
+      <div className="border-t border-border bg-background p-4 flex-shrink-0">
         {replyingTo && (
           <div className="mb-3 p-3 bg-muted rounded-lg">
             <div className="flex items-center justify-between">
