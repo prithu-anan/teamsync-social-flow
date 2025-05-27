@@ -178,7 +178,7 @@ const Messages = () => {
         </div>
         
         {/* Scrollable conversation list */}
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1 conversation-scroll-area">
           <ChannelSidebar 
             channels={filteredChannels} 
             selectedChannel={selectedChannel}

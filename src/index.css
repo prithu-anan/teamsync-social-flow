@@ -113,6 +113,37 @@
   @apply bg-muted-foreground/50;
 }
 
+/* Slim scrollbar for conversation list that appears only on hover */
+.conversation-scroll-area {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.conversation-scroll-area::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
+
+.conversation-scroll-area:hover {
+  scrollbar-width: thin; /* Firefox */
+}
+
+.conversation-scroll-area:hover::-webkit-scrollbar {
+  width: 4px;
+}
+
+.conversation-scroll-area:hover::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.conversation-scroll-area:hover::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/40 rounded-full;
+}
+
+.conversation-scroll-area:hover::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/60;
+}
+
 /* Task card styles */
 .task-card {
   @apply border bg-card p-4 rounded-lg shadow-sm hover:shadow transition-all;
