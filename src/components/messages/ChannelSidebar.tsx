@@ -12,20 +12,14 @@ interface ChannelSidebarProps {
   searchQuery: string;
 }
 
-const ChannelSidebar = ({ channels, selectedChannel, onChannelSelect, searchQuery }: ChannelSidebarProps) => {
-  const filteredChannels = channels.filter(channel =>
-    channel.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const dmChannels = filteredChannels.filter(c => c.type === 'dm');
-  const projectChannels = filteredChannels.filter(c => c.type === 'channel');
-
+const ChannelSidebar = ({ channels, selectedChannel, onChannelSelect }: ChannelSidebarProps) => {
   const renderChannel = (channel: Channel) => (
     <div
       key={channel.id}
       className={cn(
-        "flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors hover:bg-sidebar-accent",
-        selectedChannel?.id === channel.id && "bg-sidebar-accent"
+        "group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all duration-200",
+        "hover:bg-white/80 dark:hover:bg-slate-800/80 hover:shadow-sm",
+        selectedChannel?.id === channel.id && "bg-white dark:bg-slate-800 shadow-sm border border-border"
       )}
       onClick={() => onChannelSelect(channel)}
     >
@@ -67,39 +61,21 @@ const ChannelSidebar = ({ channels, selectedChannel, onChannelSelect, searchQuer
         </div>
       </div>
       
-      <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100">
+      <Button 
+        variant="ghost" 
+        size="icon" 
+        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+      >
         <MoreHorizontal className="h-3 w-3" />
       </Button>
     </div>
   );
 
   return (
-    <div className="flex-1 overflow-y-auto p-4">
-      {/* Direct Messages */}
-      {dmChannels.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-sm font-semibold text-muted-foreground mb-3 px-2">
-            Direct Messages
-          </h3>
-          <div className="space-y-1">
-            {dmChannels.map(renderChannel)}
-          </div>
-        </div>
-      )}
-
-      {/* Project Channels */}
-      {projectChannels.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-muted-foreground mb-3 px-2">
-            Channels
-          </h3>
-          <div className="space-y-1">
-            {projectChannels.map(renderChannel)}
-          </div>
-        </div>
-      )}
-
-      {filteredChannels.length === 0 && searchQuery && (
+    <div className="p-4 space-y-2">
+      {channels.length > 0 ? (
+        channels.map(renderChannel)
+      ) : (
         <div className="text-center py-8">
           <p className="text-muted-foreground">No conversations found</p>
         </div>

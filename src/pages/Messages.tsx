@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Search, Hash, Users, Plus, Settings } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ChannelSidebar from "@/components/messages/ChannelSidebar";
 import MessageThread from "@/components/messages/MessageThread";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +38,7 @@ export interface Message {
 const Messages = () => {
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState("dms");
 
   // Mock data
   const channels: Channel[] = [
@@ -137,18 +139,24 @@ const Messages = () => {
     }
   ];
 
+  const filteredChannels = channels.filter(channel => {
+    const matchesSearch = channel.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesTab = activeTab === 'dms' ? channel.type === 'dm' : channel.type === 'channel';
+    return matchesSearch && matchesTab;
+  });
+
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-background">
       {/* Channel Sidebar */}
-      <div className="w-80 border-r border-border bg-sidebar flex flex-col">
-        <div className="p-4 border-b border-border">
+      <div className="w-80 border-r border-border bg-slate-50 dark:bg-slate-900 flex flex-col">
+        <div className="p-4 border-b border-border bg-background">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold">Messages</h2>
             <Button variant="ghost" size="icon">
               <Plus className="h-4 w-4" />
             </Button>
           </div>
-          <div className="relative">
+          <div className="relative mb-4">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="text"
@@ -158,22 +166,32 @@ const Messages = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+          
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="dms">Direct Messages</TabsTrigger>
+              <TabsTrigger value="channels">Channels</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
         
-        <ChannelSidebar 
-          channels={channels} 
-          selectedChannel={selectedChannel}
-          onChannelSelect={setSelectedChannel}
-          searchQuery={searchQuery}
-        />
+        {/* Scrollable conversation list */}
+        <div className="flex-1 overflow-y-auto">
+          <ChannelSidebar 
+            channels={filteredChannels} 
+            selectedChannel={selectedChannel}
+            onChannelSelect={setSelectedChannel}
+            searchQuery=""
+          />
+        </div>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content - Scrollable message area */}
       <div className="flex-1 flex flex-col">
         {selectedChannel ? (
           <>
             {/* Channel Header */}
-            <div className="h-16 border-b border-border bg-background flex items-center justify-between px-6">
+            <div className="h-16 border-b border-border bg-background flex items-center justify-between px-6 flex-shrink-0">
               <div className="flex items-center gap-3">
                 {selectedChannel.type === 'channel' ? (
                   <Hash className="h-5 w-5 text-muted-foreground" />
@@ -201,7 +219,7 @@ const Messages = () => {
               </div>
             </div>
 
-            {/* Messages */}
+            {/* Messages - This will be scrollable */}
             <MessageThread messages={messages} channel={selectedChannel} />
           </>
         ) : (

@@ -9,6 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import ReactionPicker from "./ReactionPicker";
 import type { Message } from "@/pages/Messages";
 
 interface MessageItemProps {
@@ -68,15 +69,15 @@ const MessageItem = ({ message, onReply }: MessageItemProps) => {
         {message.reactions && message.reactions.length > 0 && (
           <div className="flex gap-1 mt-2">
             {message.reactions.map((reaction, index) => (
-              <Button
-                key={index}
-                variant="outline"
-                size="sm"
-                className="h-7 px-2 text-xs"
-                onClick={() => handleReaction(reaction.emoji)}
-              >
-                {reaction.emoji} {reaction.count}
-              </Button>
+              <ReactionPicker key={index} onReact={handleReaction}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs hover:bg-muted"
+                >
+                  {reaction.emoji} {reaction.count}
+                </Button>
+              </ReactionPicker>
             ))}
           </div>
         )}
@@ -92,22 +93,16 @@ const MessageItem = ({ message, onReply }: MessageItemProps) => {
       {/* Message Actions */}
       {showActions && (
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8"
-            onClick={() => handleReaction('👍')}
-          >
-            <ThumbsUp className="h-3 w-3" />
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8"
-            onClick={() => handleReaction('❤️')}
-          >
-            <Heart className="h-3 w-3" />
-          </Button>
+          <ReactionPicker onReact={handleReaction}>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <ThumbsUp className="h-3 w-3" />
+            </Button>
+          </ReactionPicker>
+          <ReactionPicker onReact={handleReaction}>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Heart className="h-3 w-3" />
+            </Button>
+          </ReactionPicker>
           <Button 
             variant="ghost" 
             size="icon" 
