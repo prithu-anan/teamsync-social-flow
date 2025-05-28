@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { getTasks } from "@/util/api-helpers";
 
 interface Task {
   id: string;
@@ -144,7 +145,8 @@ const mockEvents: Event[] = [
 const Dashboard = () => {
   const { user } = useAuth();
   const [progress, setProgress] = useState(0);
-  const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  // const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>(mockProjects);
   const [events, setEvents] = useState<Event[]>(mockEvents);
 
@@ -153,6 +155,30 @@ const Dashboard = () => {
     setTimeout(() => {
       setProgress(75);
     }, 100);
+  }, []);
+
+  useEffect(() => {
+    const fetchTasks = async () => {
+      const data = await getTasks();
+      if (!data.error) {
+        const transformedTasks = data.map((task: any) => ({
+          id: task.id.toString(),
+          title: task.title,
+          status: task.status === "done" ? "done" : task.status === "in_progress" ? "in-progress" : "todo",
+          priority: task.priority || "low",
+          assignee: {
+            name: task.assignedTo?.name || "Unknown",
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assignedTo?.name || "U")}`,
+          },
+          dueDate: task.deadline || new Date().toISOString(), // fallback to today if null
+        }));
+        setTasks(transformedTasks);
+      } else {
+        console.error(data.error);
+      }
+    };
+
+    fetchTasks();
   }, []);
 
   const formatDate = (dateString: string) => {

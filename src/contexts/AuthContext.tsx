@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import { toast } from "@/components/ui/use-toast";
-import { login as loginApi, signup as signupApi } from "@/util/api-helpers";
+import { getMe, login as loginApi, signup as signupApi } from "@/util/api-helpers";
 
 interface User {
   id: string;
@@ -49,7 +49,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string): Promise<boolean> => {
     const res = await loginApi({ email, password });
 
-    if (res.error) {
+    if (!res || res.error) {
       toast({
         title: "Login failed",
         description: res.error,
@@ -58,24 +58,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return false;
     }
 
-    const userWithoutPassword = {
-      id: res.id,
-      name: res.name,
-      email: res.email,
-      avatar: res.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(res.name)}`,
-    };
+    // ✅ Store token
+    localStorage.setItem("teamsync_jwt", res.jwt);
 
-    setUser(userWithoutPassword);
-    localStorage.setItem("teamsync_user", JSON.stringify(userWithoutPassword));
+    // ✅ Fetch full user profile
+    const me = await getMe();
+    if (me.error) {
+      toast({
+        title: "Login failed",
+        description: "Unable to fetch profile info",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    setUser(me);
+    localStorage.setItem("teamsync_user", JSON.stringify(me));
 
     toast({
       title: "Login successful",
-      description: `Welcome back, ${res.name}!`,
+      description: `Welcome back, ${me.name}!`,
     });
 
     return true;
   };
-
 
   const signup = async (
     name: string,
@@ -114,6 +120,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem("teamsync_user");
+    localStorage.removeItem("teamsync_jwt");
     toast({
       title: "Logged out",
       description: "You have been logged out successfully",

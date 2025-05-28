@@ -40,14 +40,41 @@ export const login = async (req) => {
     }
 }; 
 
+export const getMe = async () => {
+  const token = localStorage.getItem("teamsync_jwt");
+
+  try {
+    const res = await axios.get(`${API_BASE_URL}/auth/me`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return res.data; // ✅ Don't forget to return the user data
+  } catch (err) {
+    if (err.response) {
+      return { error: err.response.data || "Failed to fetch user" };
+    } else if (err.request) {
+      return { error: "No response from server. Check your connection." };
+    } else {
+      return { error: "An unexpected error occurred." };
+    }
+  }
+};
+
 export const getTasks = async () => {
+    const token = localStorage.getItem("teamsync_jwt");
+
     try {
-        const res = await axios.get(`${API_BASE_URL}/api/tasks`);
+        const res = await axios.get(`${API_BASE_URL}/tasks`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
 
         if (res.status === 200) {
             return res.data;
         }
-
     } catch (err) {
         if (err.response) {
             return { error: err.response.data || "Failed to fetch tasks" };
@@ -57,4 +84,4 @@ export const getTasks = async () => {
             return { error: "An unexpected error occurred." };
         }
     }
-}
+};
