@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -163,4 +162,56 @@
 
 .animate-progress {
   animation: progress 1.5s ease-in-out;
+}
+
+/* Kanban board wooden background (realistic) */
+.kanban-board {
+  min-height: 100vh;
+  background: url('/wood-texture.jpg'); /* Place the wood image in public/wood-texture.jpg */
+  background-size: cover;
+  background-position: center;
+  @apply p-6 rounded-lg flex gap-6;
+}
+
+/* Sticky note color variants */
+.sticky-yellow { background-color: #FFF9B1; }
+.sticky-green  { background-color: #C8F7C5; }
+.sticky-blue   { background-color: #B5E3F7; }
+.sticky-pink   { background-color: #FFD1DC; }
+.sticky-orange { background-color: #FFD59E; }
+.sticky-purple { background-color: #E1D5FF; }
+
+.task-card {
+  /* Remove previous bg-yellow-50 etc. */
+  @apply border p-4 rounded-lg shadow-md hover:shadow-lg transition-all;
+  background-image: none;
+  transform: rotate(-1deg);
+  transition: transform 0.2s cubic-bezier(0.4,0,0.2,1), box-shadow 0.2s;
+}
+
+.task-card:hover {
+  transform: rotate(0deg) scale(1.03);
+}
+
+.task-card.dragging {
+  @apply shadow-2xl;
+  transform: rotate(0deg) scale(1.08);
+  z-index: 50;
+  opacity: 0.95;
+}
+
+/* Task card transition animation */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.task-card {
+  animation: slideIn 0.3s ease-out;
 }

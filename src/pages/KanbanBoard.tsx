@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Check, Clock, Plus, Filter } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +12,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 
 interface KanbanTask {
   id: string;
@@ -145,13 +145,39 @@ const initialTasks: KanbanTask[] = [
   },
 ];
 
+const stickyColors = [
+  'sticky-yellow',
+  'sticky-green',
+  'sticky-blue',
+  'sticky-pink',
+  'sticky-orange',
+  'sticky-purple',
+];
+
+const columnOrder = ["todo", "in-progress", "review", "done"];
+const columnNames: Record<string, string> = {
+  "todo": "To Do",
+  "in-progress": "In Progress",
+  "review": "Review",
+  "done": "Done"
+};
+const columnColors: Record<string, string> = {
+  "todo": "bg-gray-400",
+  "in-progress": "bg-blue-500",
+  "review": "bg-amber-500",
+  "done": "bg-green-500"
+};
+
+function groupTasksByStatus(tasks: KanbanTask[]) {
+  return columnOrder.reduce((acc, col) => {
+    acc[col] = tasks.filter(t => t.status === col);
+    return acc;
+  }, {} as Record<string, KanbanTask[]>);
+}
+
 const KanbanBoard = () => {
   const [tasks, setTasks] = useState<KanbanTask[]>(initialTasks);
-
-  // Get tasks by status
-  const getTasks = (status: KanbanTask["status"]) => {
-    return tasks.filter((task) => task.status === status);
-  };
+  const [columns, setColumns] = useState(() => groupTasksByStatus(initialTasks));
 
   // Get color based on priority
   const getPriorityColor = (priority: string) => {
@@ -177,8 +203,39 @@ const KanbanBoard = () => {
     }).format(date);
   };
 
-  // Custom drag and drop handlers would go here in a real application
-  
+  // Assign a sticky note color based on task id (for consistency)
+  const getStickyColor = (taskId: string) => {
+    let hash = 0;
+    for (let i = 0; i < taskId.length; i++) {
+      hash = taskId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return stickyColors[Math.abs(hash) % stickyColors.length];
+  };
+
+  // DnD handler
+  const onDragEnd = (result: DropResult) => {
+    const { source, destination } = result;
+    if (!destination) return;
+    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+    const sourceCol = source.droppableId;
+    const destCol = destination.droppableId;
+    const sourceTasks = Array.from(columns[sourceCol]);
+    const destTasks = Array.from(columns[destCol]);
+    const [removed] = sourceTasks.splice(source.index, 1);
+    if (sourceCol === destCol) {
+      sourceTasks.splice(destination.index, 0, removed);
+      setColumns({ ...columns, [sourceCol]: sourceTasks });
+    } else {
+      removed.status = destCol as KanbanTask["status"];
+      destTasks.splice(destination.index, 0, removed);
+      setColumns({
+        ...columns,
+        [sourceCol]: sourceTasks,
+        [destCol]: destTasks,
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header section */}
@@ -210,363 +267,123 @@ const KanbanBoard = () => {
         </div>
       </div>
 
-      {/* Kanban board */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Todo column */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className="h-2 w-2 rounded-full bg-gray-400"></div>
-              <h3 className="font-semibold">To Do</h3>
-              <Badge variant="outline">{getTasks("todo").length}</Badge>
-            </div>
-            <Button variant="ghost" size="icon">
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="space-y-3 min-h-[200px]">
-            {getTasks("todo").map((task) => (
-              <Card key={task.id} className="task-card">
-                <CardContent className="p-3">
-                  <div className="flex justify-between">
-                    <div className={`h-2 w-2 mt-1 rounded-full ${getPriorityColor(task.priority)}`} />
-                    <DropdownMenu>
-                      <DropdownMenuTrigger className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-muted">
-                        <span className="sr-only">Open menu</span>
-                        <svg
-                          width="15"
-                          height="3"
-                          viewBox="0 0 15 3"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="text-muted-foreground"
-                        >
-                          <path
-                            d="M1.5 1.5C1.5 1.89782 1.65804 2.27936 1.93934 2.56066C2.22064 2.84196 2.60218 3 3 3C3.39782 3 3.77936 2.84196 4.06066 2.56066C4.34196 2.27936 4.5 1.89782 4.5 1.5C4.5 1.10218 4.34196 0.720644 4.06066 0.43934C3.77936 0.158035 3.39782 0 3 0C2.60218 0 2.22064 0.158035 1.93934 0.43934C1.65804 0.720644 1.5 1.10218 1.5 1.5ZM6 1.5C6 1.89782 6.15804 2.27936 6.43934 2.56066C6.72064 2.84196 7.10218 3 7.5 3C7.89782 3 8.27936 2.84196 8.56066 2.56066C8.84196 2.27936 9 1.89782 9 1.5C9 1.10218 8.84196 0.720644 8.56066 0.43934C8.27936 0.158035 7.89782 0 7.5 0C7.10218 0 6.72064 0.158035 6.43934 0.43934C6.15804 0.720644 6 1.10218 6 1.5ZM10.5 1.5C10.5 1.89782 10.658 2.27936 10.9393 2.56066C11.2206 2.84196 11.6022 3 12 3C12.3978 3 12.7794 2.84196 13.0607 2.56066C13.342 2.27936 13.5 1.89782 13.5 1.5C13.5 1.10218 13.342 0.720644 13.0607 0.43934C12.7794 0.158035 12.3978 0 12 0C11.6022 0 11.2206 0.158035 10.9393 0.43934C10.658 0.720644 10.5 1.10218 10.5 1.5Z"
-                            fill="currentColor"
-                          />
-                        </svg>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>Edit</DropdownMenuItem>
-                        <DropdownMenuItem>Move</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive">
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  <h4 className="font-medium mt-2">{task.title}</h4>
-                  {task.description && (
-                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                      {task.description}
-                    </p>
-                  )}
-                  {task.tags && (
-                    <div className="flex flex-wrap gap-1 mt-3">
-                      {task.tags.map((tag) => (
-                        <Badge key={tag} variant="secondary" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
+      <DragDropContext onDragEnd={onDragEnd}>
+        <div className="kanban-board grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 min-h-screen">
+          {columnOrder.map((col) => (
+            <Droppable droppableId={col} key={col}>
+              {(provided, snapshot) => (
+                <div
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  className="flex flex-col bg-white/10 rounded-lg p-2 min-w-0 w-full h-full"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-2">
+                      <div className={`h-2 w-2 rounded-full ${columnColors[col]}`}></div>
+                      <h3 className="font-semibold text-white">{columnNames[col]}</h3>
+                      <Badge variant="outline" className="bg-white/10 text-white border-white/20">{columns[col].length}</Badge>
                     </div>
-                  )}
-                  <div className="flex justify-between items-center mt-4">
-                    {task.assignee ? (
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage
-                          src={task.assignee.avatar}
-                          alt={task.assignee.name}
-                        />
-                        <AvatarFallback>
-                          {task.assignee.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                    ) : (
-                      <div className="h-6 w-6"></div>
-                    )}
-                    {task.dueDate && (
-                      <div className="flex items-center text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {formatDate(task.dueDate)}
-                      </div>
-                    )}
+                    <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
+                      <Plus className="h-4 w-4" />
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  <div className="flex flex-col gap-3 flex-1 min-w-0">
+                    {columns[col].map((task, idx) => (
+                      <Draggable draggableId={task.id} index={idx} key={task.id}>
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            className={`task-card ${getStickyColor(task.id)} ${snapshot.isDragging ? 'dragging' : ''}`}
+                            style={{
+                              ...provided.draggableProps.style,
+                              minWidth: 0,
+                              maxWidth: '100%',
+                            }}
+                          >
+                            <CardContent className="p-3">
+                              <div className="flex justify-between">
+                                <div className={`h-2 w-2 mt-1 rounded-full ${getPriorityColor(task.priority)}`} />
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-muted">
+                                    <span className="sr-only">Open menu</span>
+                                    <svg
+                                      width="15"
+                                      height="3"
+                                      viewBox="0 0 15 3"
+                                      fill="none"
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      className="text-muted-foreground"
+                                    >
+                                      <path
+                                        d="M1.5 1.5C1.5 1.89782 1.65804 2.27936 1.93934 2.56066C2.22064 2.84196 2.60218 3 3 3C3.39782 3 3.77936 2.84196 4.06066 2.56066C4.34196 2.27936 4.5 1.89782 4.5 1.5C4.5 1.10218 4.34196 0.720644 4.06066 0.43934C3.77936 0.158035 3.39782 0 3 0C2.60218 0 2.22064 0.158035 1.93934 0.43934C1.65804 0.720644 1.5 1.10218 1.5 1.5ZM6 1.5C6 1.89782 6.15804 2.27936 6.43934 2.56066C6.72064 2.84196 7.10218 3 7.5 3C7.89782 3 8.27936 2.84196 8.56066 2.56066C8.84196 2.27936 9 1.89782 9 1.5C9 1.10218 8.84196 0.720644 8.56066 0.43934C8.27936 0.158035 7.89782 0 7.5 0C7.10218 0 6.72064 0.158035 6.43934 0.43934C6.15804 0.720644 6 1.10218 6 1.5ZM10.5 1.5C10.5 1.89782 10.658 2.27936 10.9393 2.56066C11.2206 2.84196 11.6022 3 12 3C12.3978 3 12.7794 2.84196 13.0607 2.56066C13.342 2.27936 13.5 1.89782 13.5 1.5C13.5 1.10218 13.342 0.720644 13.0607 0.43934C12.7794 0.158035 12.3978 0 12 0C11.6022 0 11.2206 0.158035 10.9393 0.43934C10.658 0.720644 10.5 1.10218 10.5 1.5Z"
+                                        fill="currentColor"
+                                      />
+                                    </svg>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem>Edit</DropdownMenuItem>
+                                    <DropdownMenuItem>Move</DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem className="text-destructive">
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                              <h4 className="font-medium mt-2">{task.title}</h4>
+                              {task.description && (
+                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                  {task.description}
+                                </p>
+                              )}
+                              {task.tags && (
+                                <div className="flex flex-wrap gap-1 mt-3">
+                                  {task.tags.map((tag) => (
+                                    <Badge key={tag} variant="secondary" className="text-xs">
+                                      {tag}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                              <div className="flex justify-between items-center mt-4">
+                                {task.assignee ? (
+                                  <Avatar className="h-6 w-6">
+                                    <AvatarImage
+                                      src={task.assignee.avatar}
+                                      alt={task.assignee.name}
+                                    />
+                                    <AvatarFallback>
+                                      {task.assignee.name
+                                        .split(" ")
+                                        .map((n) => n[0])
+                                        .join("")}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                ) : (
+                                  <div className="h-6 w-6"></div>
+                                )}
+                                {task.dueDate && (
+                                  <div className="flex items-center text-xs text-muted-foreground">
+                                    <Clock className="h-3 w-3 mr-1" />
+                                    {formatDate(task.dueDate)}
+                                  </div>
+                                )}
+                              </div>
+                            </CardContent>
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </div>
+                </div>
+              )}
+            </Droppable>
+          ))}
         </div>
-
-        {/* In Progress column */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className="h-2 w-2 rounded-full bg-blue-500"></div>
-              <h3 className="font-semibold">In Progress</h3>
-              <Badge variant="outline">{getTasks("in-progress").length}</Badge>
-            </div>
-            <Button variant="ghost" size="icon">
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="space-y-3 min-h-[200px]">
-            {getTasks("in-progress").map((task) => (
-              <Card key={task.id} className="task-card">
-                <CardContent className="p-3">
-                  <div className="flex justify-between">
-                    <div className={`h-2 w-2 mt-1 rounded-full ${getPriorityColor(task.priority)}`} />
-                    <DropdownMenu>
-                      <DropdownMenuTrigger className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-muted">
-                        <span className="sr-only">Open menu</span>
-                        <svg
-                          width="15"
-                          height="3"
-                          viewBox="0 0 15 3"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="text-muted-foreground"
-                        >
-                          <path
-                            d="M1.5 1.5C1.5 1.89782 1.65804 2.27936 1.93934 2.56066C2.22064 2.84196 2.60218 3 3 3C3.39782 3 3.77936 2.84196 4.06066 2.56066C4.34196 2.27936 4.5 1.89782 4.5 1.5C4.5 1.10218 4.34196 0.720644 4.06066 0.43934C3.77936 0.158035 3.39782 0 3 0C2.60218 0 2.22064 0.158035 1.93934 0.43934C1.65804 0.720644 1.5 1.10218 1.5 1.5ZM6 1.5C6 1.89782 6.15804 2.27936 6.43934 2.56066C6.72064 2.84196 7.10218 3 7.5 3C7.89782 3 8.27936 2.84196 8.56066 2.56066C8.84196 2.27936 9 1.89782 9 1.5C9 1.10218 8.84196 0.720644 8.56066 0.43934C8.27936 0.158035 7.89782 0 7.5 0C7.10218 0 6.72064 0.158035 6.43934 0.43934C6.15804 0.720644 6 1.10218 6 1.5ZM10.5 1.5C10.5 1.89782 10.658 2.27936 10.9393 2.56066C11.2206 2.84196 11.6022 3 12 3C12.3978 3 12.7794 2.84196 13.0607 2.56066C13.342 2.27936 13.5 1.89782 13.5 1.5C13.5 1.10218 13.342 0.720644 13.0607 0.43934C12.7794 0.158035 12.3978 0 12 0C11.6022 0 11.2206 0.158035 10.9393 0.43934C10.658 0.720644 10.5 1.10218 10.5 1.5Z"
-                            fill="currentColor"
-                          />
-                        </svg>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>Edit</DropdownMenuItem>
-                        <DropdownMenuItem>Move</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive">
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  <h4 className="font-medium mt-2">{task.title}</h4>
-                  {task.description && (
-                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                      {task.description}
-                    </p>
-                  )}
-                  {task.tags && (
-                    <div className="flex flex-wrap gap-1 mt-3">
-                      {task.tags.map((tag) => (
-                        <Badge key={tag} variant="secondary" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center mt-4">
-                    {task.assignee ? (
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage
-                          src={task.assignee.avatar}
-                          alt={task.assignee.name}
-                        />
-                        <AvatarFallback>
-                          {task.assignee.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                    ) : (
-                      <div className="h-6 w-6"></div>
-                    )}
-                    {task.dueDate && (
-                      <div className="flex items-center text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {formatDate(task.dueDate)}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-
-        {/* Review column */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className="h-2 w-2 rounded-full bg-amber-500"></div>
-              <h3 className="font-semibold">Review</h3>
-              <Badge variant="outline">{getTasks("review").length}</Badge>
-            </div>
-            <Button variant="ghost" size="icon">
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="space-y-3 min-h-[200px]">
-            {getTasks("review").map((task) => (
-              <Card key={task.id} className="task-card">
-                <CardContent className="p-3">
-                  <div className="flex justify-between">
-                    <div className={`h-2 w-2 mt-1 rounded-full ${getPriorityColor(task.priority)}`} />
-                    <DropdownMenu>
-                      <DropdownMenuTrigger className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-muted">
-                        <span className="sr-only">Open menu</span>
-                        <svg
-                          width="15"
-                          height="3"
-                          viewBox="0 0 15 3"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="text-muted-foreground"
-                        >
-                          <path
-                            d="M1.5 1.5C1.5 1.89782 1.65804 2.27936 1.93934 2.56066C2.22064 2.84196 2.60218 3 3 3C3.39782 3 3.77936 2.84196 4.06066 2.56066C4.34196 2.27936 4.5 1.89782 4.5 1.5C4.5 1.10218 4.34196 0.720644 4.06066 0.43934C3.77936 0.158035 3.39782 0 3 0C2.60218 0 2.22064 0.158035 1.93934 0.43934C1.65804 0.720644 1.5 1.10218 1.5 1.5ZM6 1.5C6 1.89782 6.15804 2.27936 6.43934 2.56066C6.72064 2.84196 7.10218 3 7.5 3C7.89782 3 8.27936 2.84196 8.56066 2.56066C8.84196 2.27936 9 1.89782 9 1.5C9 1.10218 8.84196 0.720644 8.56066 0.43934C8.27936 0.158035 7.89782 0 7.5 0C7.10218 0 6.72064 0.158035 6.43934 0.43934C6.15804 0.720644 6 1.10218 6 1.5ZM10.5 1.5C10.5 1.89782 10.658 2.27936 10.9393 2.56066C11.2206 2.84196 11.6022 3 12 3C12.3978 3 12.7794 2.84196 13.0607 2.56066C13.342 2.27936 13.5 1.89782 13.5 1.5C13.5 1.10218 13.342 0.720644 13.0607 0.43934C12.7794 0.158035 12.3978 0 12 0C11.6022 0 11.2206 0.158035 10.9393 0.43934C10.658 0.720644 10.5 1.10218 10.5 1.5Z"
-                            fill="currentColor"
-                          />
-                        </svg>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>Edit</DropdownMenuItem>
-                        <DropdownMenuItem>Move</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive">
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  <h4 className="font-medium mt-2">{task.title}</h4>
-                  {task.description && (
-                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                      {task.description}
-                    </p>
-                  )}
-                  {task.tags && (
-                    <div className="flex flex-wrap gap-1 mt-3">
-                      {task.tags.map((tag) => (
-                        <Badge key={tag} variant="secondary" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center mt-4">
-                    {task.assignee ? (
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage
-                          src={task.assignee.avatar}
-                          alt={task.assignee.name}
-                        />
-                        <AvatarFallback>
-                          {task.assignee.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                    ) : (
-                      <div className="h-6 w-6"></div>
-                    )}
-                    {task.dueDate && (
-                      <div className="flex items-center text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {formatDate(task.dueDate)}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-
-        {/* Done column */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <div className="h-2 w-2 rounded-full bg-green-500"></div>
-              <h3 className="font-semibold">Done</h3>
-              <Badge variant="outline">{getTasks("done").length}</Badge>
-            </div>
-            <Button variant="ghost" size="icon">
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="space-y-3 min-h-[200px]">
-            {getTasks("done").map((task) => (
-              <Card key={task.id} className="task-card">
-                <CardContent className="p-3">
-                  <div className="flex justify-between">
-                    <div className="flex items-center">
-                      <Check className="h-4 w-4 text-green-500 mr-1" />
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-muted">
-                        <span className="sr-only">Open menu</span>
-                        <svg
-                          width="15"
-                          height="3"
-                          viewBox="0 0 15 3"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="text-muted-foreground"
-                        >
-                          <path
-                            d="M1.5 1.5C1.5 1.89782 1.65804 2.27936 1.93934 2.56066C2.22064 2.84196 2.60218 3 3 3C3.39782 3 3.77936 2.84196 4.06066 2.56066C4.34196 2.27936 4.5 1.89782 4.5 1.5C4.5 1.10218 4.34196 0.720644 4.06066 0.43934C3.77936 0.158035 3.39782 0 3 0C2.60218 0 2.22064 0.158035 1.93934 0.43934C1.65804 0.720644 1.5 1.10218 1.5 1.5ZM6 1.5C6 1.89782 6.15804 2.27936 6.43934 2.56066C6.72064 2.84196 7.10218 3 7.5 3C7.89782 3 8.27936 2.84196 8.56066 2.56066C8.84196 2.27936 9 1.89782 9 1.5C9 1.10218 8.84196 0.720644 8.56066 0.43934C8.27936 0.158035 7.89782 0 7.5 0C7.10218 0 6.72064 0.158035 6.43934 0.43934C6.15804 0.720644 6 1.10218 6 1.5ZM10.5 1.5C10.5 1.89782 10.658 2.27936 10.9393 2.56066C11.2206 2.84196 11.6022 3 12 3C12.3978 3 12.7794 2.84196 13.0607 2.56066C13.342 2.27936 13.5 1.89782 13.5 1.5C13.5 1.10218 13.342 0.720644 13.0607 0.43934C12.7794 0.158035 12.3978 0 12 0C11.6022 0 11.2206 0.158035 10.9393 0.43934C10.658 0.720644 10.5 1.10218 10.5 1.5Z"
-                            fill="currentColor"
-                          />
-                        </svg>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>Edit</DropdownMenuItem>
-                        <DropdownMenuItem>Move</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive">
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  <h4 className="font-medium mt-2">{task.title}</h4>
-                  {task.tags && (
-                    <div className="flex flex-wrap gap-1 mt-3">
-                      {task.tags.map((tag) => (
-                        <Badge key={tag} variant="secondary" className="text-xs">
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex justify-between items-center mt-4">
-                    {task.assignee ? (
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage
-                          src={task.assignee.avatar}
-                          alt={task.assignee.name}
-                        />
-                        <AvatarFallback>
-                          {task.assignee.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                    ) : (
-                      <div className="h-6 w-6"></div>
-                    )}
-                    <div className="flex items-center text-xs text-muted-foreground">
-                      <Check className="h-3 w-3 mr-1" />
-                      Completed
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </div>
+      </DragDropContext>
     </div>
   );
 };
