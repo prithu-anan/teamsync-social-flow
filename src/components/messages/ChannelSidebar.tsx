@@ -1,4 +1,3 @@
-
 import { Hash, Circle, MoreHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,7 +41,7 @@ const ChannelSidebar = ({ channels, selectedChannel, onChannelSelect }: ChannelS
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
             <span className="font-medium truncate">{channel.name}</span>
-            {channel.unreadCount && channel.unreadCount > 0 && (
+            {typeof channel.unreadCount === 'number' && channel.unreadCount > 0 && (
               <Badge variant="destructive" className="text-xs">
                 {channel.unreadCount}
               </Badge>
