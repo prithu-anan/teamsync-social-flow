@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Bell, Search, Plus } from "lucide-react";
@@ -26,7 +25,7 @@ const Header = () => {
         <SidebarTrigger />
       </div>
 
-      <div className="flex items-center gap-2 md:gap-4 w-full">
+      <div className="flex items-center justify-between w-full">
         <div className="relative flex-1 max-w-md hidden md:flex">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -38,7 +37,7 @@ const Header = () => {
           />
         </div>
 
-        <div className="flex-1 md:flex-none flex items-center justify-end gap-2 md:gap-4">
+        <div className="flex items-center gap-2 md:gap-4">
           <Button variant="outline" size="icon">
             <Bell className="h-4 w-4" />
           </Button>

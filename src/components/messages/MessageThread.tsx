@@ -182,7 +182,7 @@ const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMes
         </div>
       </ScrollArea>
       {/* Message Input - Fixed at bottom */}
-      <div className="p-4 border-t border-border bg-background">
+      <div className="p-4 border-t border-border bg-background/30">
         {replyingTo && (
           <div className="mb-3 p-3 bg-muted rounded-lg flex items-center justify-between">
             <div className="truncate">

@@ -8,6 +8,7 @@ import ChannelSidebar from "@/components/messages/ChannelSidebar";
 import MessageThread from "@/components/messages/MessageThread";
 import { Badge } from "@/components/ui/badge";
 import ThreadModal from "@/components/messages/ThreadModal";
+import WaterBackground from '@/components/WaterBackground';
 
 export interface Channel {
   id: string;
@@ -169,114 +170,117 @@ const Messages = () => {
   };
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] bg-background">
-      {/* Channel Sidebar - Fixed height with internal scrolling */}
-      <div className="w-80 border-r border-border bg-slate-50 dark:bg-slate-900 flex flex-col min-h-0">
-        {/* Fixed header */}
-        <div className="p-4 border-b border-border bg-background flex-shrink-0">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold">Messages</h2>
-            <Button variant="ghost" size="icon">
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="relative mb-4">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search conversations..."
-              className="pl-8"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+    <>
+      <WaterBackground />
+      <div className="flex h-[calc(100vh-8rem)] bg-white/10 backdrop-blur-sm">
+        {/* Channel Sidebar - Fixed height with internal scrolling */}
+        <div className="w-80 border-r border-border bg-white/50 dark:bg-slate-900 flex flex-col min-h-0">
+          {/* Fixed header */}
+          <div className="p-4 border-b border-border bg-background/50 flex-shrink-0">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Messages</h2>
+              <Button variant="ghost" size="icon">
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="relative mb-4">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search conversations..."
+                className="pl-8"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="dms">Direct Messages</TabsTrigger>
+                <TabsTrigger value="channels">Channels</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
           
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="dms">Direct Messages</TabsTrigger>
-              <TabsTrigger value="channels">Channels</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          {/* Scrollable conversation list */}
+          <ScrollArea className="flex-1 min-h-0 conversation-scroll-area">
+            <ChannelSidebar 
+              channels={filteredChannels} 
+              selectedChannel={selectedChannel}
+              onChannelSelect={handleChannelSelect}
+              searchQuery={searchQuery}
+            />
+          </ScrollArea>
         </div>
-        
-        {/* Scrollable conversation list */}
-        <ScrollArea className="flex-1 min-h-0 conversation-scroll-area">
-          <ChannelSidebar 
-            channels={filteredChannels} 
-            selectedChannel={selectedChannel}
-            onChannelSelect={handleChannelSelect}
-            searchQuery={searchQuery}
-          />
-        </ScrollArea>
-      </div>
 
-      {/* Main Content - Fixed height with internal scrolling */}
-      <div className="flex-1 flex flex-col min-h-0">
-        {selectedChannel ? (
-          <>
-            {/* Channel Header - Fixed */}
-            <div className="h-16 border-b border-border bg-background flex items-center justify-between px-6 flex-shrink-0">
-              <div className="flex items-center gap-3">
-                {selectedChannel.type === 'channel' ? (
-                  <Hash className="h-5 w-5 text-muted-foreground" />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-sm font-medium">
-                      {selectedChannel.name.split(' ').map(n => n[0]).join('')}
-                    </span>
-                  </div>
-                )}
-                <div>
-                  <h3 className="font-semibold">{selectedChannel.name}</h3>
-                  {selectedChannel.type === 'channel' && selectedChannel.project && (
-                    <p className="text-sm text-muted-foreground">{selectedChannel.project} Project</p>
+        {/* Main Content - Fixed height with internal scrolling */}
+        <div className="flex-1 flex flex-col min-h-0 bg-white/50">
+          {selectedChannel ? (
+            <>
+              {/* Channel Header - Fixed */}
+              <div className="h-16 border-b border-border bg-background/80 flex items-center justify-between px-6 flex-shrink-0">
+                <div className="flex items-center gap-3">
+                  {selectedChannel.type === 'channel' ? (
+                    <Hash className="h-5 w-5 text-muted-foreground" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-sm font-medium">
+                        {selectedChannel.name.split(' ').map(n => n[0]).join('')}
+                      </span>
+                    </div>
                   )}
+                  <div>
+                    <h3 className="font-semibold">{selectedChannel.name}</h3>
+                    {selectedChannel.type === 'channel' && selectedChannel.project && (
+                      <p className="text-sm text-muted-foreground">{selectedChannel.project} Project</p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="icon">
+                    <Users className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon">
+                    <Settings className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon">
-                  <Users className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon">
-                  <Settings className="h-4 w-4" />
-                </Button>
+
+              {/* Messages - Scrollable content */}
+              <div className="flex-1 min-h-0 flex flex-col">
+                <MessageThread 
+                  messages={allMessages.filter(m => m.channelId === selectedChannel.id)} 
+                  channel={selectedChannel} 
+                  openThread={openThread}
+                  setOpenThread={setOpenThread}
+                  pinnedMessages={pinnedMessages[selectedChannel.id] || []}
+                  onPinMessage={(msg) => setPinnedMessages(p => ({...p, [selectedChannel.id]: [...(p[selectedChannel.id]||[]), msg]}))}
+                  onUnpinMessage={(msg) => setPinnedMessages(p => ({...p, [selectedChannel.id]: (p[selectedChannel.id]||[]).filter(m => m.id !== msg.id)}))}
+                  sendMessage={sendMessage}
+                />
+                {/* Thread Modal */}
+                {openThread && (
+                  <ThreadModal 
+                    threadMessage={openThread.message}
+                    channel={openThread.channel}
+                    allMessages={allMessages}
+                    sendMessage={sendMessage}
+                    onClose={() => setOpenThread(null)}
+                  />
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-center">
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Select a conversation</h3>
+                <p className="text-muted-foreground">Choose a channel or direct message to start chatting</p>
               </div>
             </div>
-
-            {/* Messages - Scrollable content */}
-            <div className="flex-1 min-h-0 flex flex-col">
-              <MessageThread 
-                messages={allMessages.filter(m => m.channelId === selectedChannel.id)} 
-                channel={selectedChannel} 
-                openThread={openThread}
-                setOpenThread={setOpenThread}
-                pinnedMessages={pinnedMessages[selectedChannel.id] || []}
-                onPinMessage={(msg) => setPinnedMessages(p => ({...p, [selectedChannel.id]: [...(p[selectedChannel.id]||[]), msg]}))}
-                onUnpinMessage={(msg) => setPinnedMessages(p => ({...p, [selectedChannel.id]: (p[selectedChannel.id]||[]).filter(m => m.id !== msg.id)}))}
-                sendMessage={sendMessage}
-              />
-              {/* Thread Modal */}
-              {openThread && (
-                <ThreadModal 
-                  threadMessage={openThread.message}
-                  channel={openThread.channel}
-                  allMessages={allMessages}
-                  sendMessage={sendMessage}
-                  onClose={() => setOpenThread(null)}
-                />
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center text-center">
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Select a conversation</h3>
-              <p className="text-muted-foreground">Choose a channel or direct message to start chatting</p>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 

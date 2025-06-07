@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from "react";
 import { Outlet, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import AppSidebar from "@/components/AppSidebar";
 import Header from "@/components/Header";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import WaterBackground from '@/components/WaterBackground';
 
 const MainLayout = () => {
   const { isAuthenticated } = useAuth();
@@ -31,6 +31,7 @@ const MainLayout = () => {
       open={isMobile ? false : undefined}
     >
       <div className="flex min-h-screen w-full">
+        <WaterBackground />
         <AppSidebar />
         <div className="flex flex-col flex-1">
           <Header />
