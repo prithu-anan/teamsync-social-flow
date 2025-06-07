@@ -1,4 +1,3 @@
-
 import { NavLink, useLocation } from "react-router-dom";
 import { 
   LayoutDashboard, 
@@ -7,7 +6,8 @@ import {
   Calendar, 
   Settings,
   MessageCircle,
-  Bell
+  Bell,
+  PenTool
 } from "lucide-react";
 import {
   Sidebar,
@@ -148,6 +148,14 @@ const AppSidebar = () => {
               <NavLink to="/notifications" className={getLinkClass}>
                 <Bell className={cn("h-5 w-5", isCollapsed && "h-6 w-6 mx-auto")} />
                 {!isCollapsed && <span>Notifications</span>}
+              </NavLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <NavLink to="/whiteboard" className={getLinkClass}>
+                <PenTool className={cn("h-5 w-5", isCollapsed && "h-6 w-6 mx-auto")} />
+                {!isCollapsed && <span>Whiteboard</span>}
               </NavLink>
             </SidebarMenuButton>
           </SidebarMenuItem>

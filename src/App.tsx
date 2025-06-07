@@ -14,6 +14,7 @@ import Messages from "./pages/Messages";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
+import Whiteboard from "./pages/Whiteboard";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,7 @@ const App = () => (
               <Route path="social" element={<SocialFeed />} />
               <Route path="calendar" element={<Calendar />} />
               <Route path="messages" element={<Messages />} />
+              <Route path="whiteboard" element={<Whiteboard />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
