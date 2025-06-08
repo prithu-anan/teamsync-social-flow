@@ -1,4 +1,4 @@
-name: CI/CD → Frontend → Azure VM
+name: Build & Deploy Frontend
 
 on:
   push:
@@ -8,14 +8,35 @@ permissions:
   contents: read
 
 jobs:
+  build_and_push:
+    name: Build & Push Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          registry: docker.io
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASS }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: |
+            prithuanan/teamsync-social-flow:latest
+            prithuanan/teamsync-social-flow:${{ github.sha }}
+
   deploy:
+    name: Deploy to Azure VM
+    needs: build_and_push
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy to VM
+      - name: SSH & Deploy
         uses: appleboy/ssh-action@v1.1.0
         with:
           host:     ${{ secrets.VM_HOST }}
@@ -25,21 +46,14 @@ jobs:
           script: |
             set -eux
 
-            # go to the frontend app folder
-            mkdir -p ~/teamsync/teamsync-social-flow
-            cd ~/teamsync/teamsync-social-flow
+            # pull the freshly built image
+            docker pull prithuanan/teamsync-social-flow:${{ github.sha }} || \
+              docker pull prithuanan/teamsync-social-flow:latest
 
-            # clone or reset via HTTPS + token
-            if [ ! -d .git ]; then
-              git clone \
-                https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/prithu-anan/teamsync-social-flow.git .
-            else
-              git remote set-url origin \
-                https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/prithu-anan/teamsync-social-flow.git
-              git fetch origin main
-              git reset --hard origin/main
-            fi
+            # (re)create the container
+            docker rm -f frontend || true
+            docker run -d \
+              --name frontend \
+              -p 3000:80 \
+              prithuanan/teamsync-social-flow:${{ github.sha }}
 
-            # build & launch with Docker Compose
-            docker compose pull || true
-            docker compose up -d --build
