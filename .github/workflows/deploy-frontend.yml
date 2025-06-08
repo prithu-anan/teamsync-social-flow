@@ -48,6 +48,8 @@ jobs:
             export TAG=${{ github.sha }}
             docker pull prithuanan/teamsync-social-flow:${TAG} || docker pull prithuanan/teamsync-social-flow:latest
 
+            docker rm -f frontend || true
+
             # kill any container exposing host port 3000
             old=$(docker ps -q --filter "publish=3000")
             if [ -n "$old" ]; then
