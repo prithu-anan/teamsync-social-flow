@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = 'http://135.235.169.115:8080';
 
 export const signup = async (req) => {
     try {
@@ -22,6 +22,7 @@ export const signup = async (req) => {
 }; 
 
 export const login = async (req) => {
+    console.log(API_BASE_URL);
     try {
         const res = await axios.post(`${API_BASE_URL}/auth/login`, { email: req.email, password: req.password });
 
