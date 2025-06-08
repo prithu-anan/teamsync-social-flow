@@ -46,14 +46,17 @@ jobs:
           script: |
             set -eux
 
-            # pull the freshly built image
-            docker pull prithuanan/teamsync-social-flow:${{ github.sha }} || \
+            # Tell Docker which tag to use
+            export TAG=${{ github.sha }}
+
+            # Pull the image for this commit, or fallback to latest
+            docker pull prithuanan/teamsync-social-flow:${TAG} || \
               docker pull prithuanan/teamsync-social-flow:latest
 
-            # (re)create the container
+            # Replace the running container
             docker rm -f frontend || true
             docker run -d \
               --name frontend \
               -p 3000:80 \
-              prithuanan/teamsync-social-flow:${{ github.sha }}
+              prithuanan/teamsync-social-flow:${TAG}
 
