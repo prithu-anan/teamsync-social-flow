@@ -39,7 +39,10 @@ jobs:
       - name: SSH & Deploy
         uses: appleboy/ssh-action@v1.1.0
         with:
-          # … your host/user/key/port …
+          host:     ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key:      ${{ secrets.SSH_KEY }}
+          port:     22
           script: |
             set -eux
             export TAG=${{ github.sha }}
