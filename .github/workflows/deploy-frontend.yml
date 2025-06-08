@@ -39,24 +39,22 @@ jobs:
       - name: SSH & Deploy
         uses: appleboy/ssh-action@v1.1.0
         with:
-          host:     ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key:      ${{ secrets.SSH_KEY }}
-          port:     22
+          # … your host/user/key/port …
           script: |
             set -eux
-
-            # Tell Docker which tag to use
             export TAG=${{ github.sha }}
+            docker pull prithuanan/teamsync-social-flow:${TAG} || docker pull prithuanan/teamsync-social-flow:latest
 
-            # Pull the image for this commit, or fallback to latest
-            docker pull prithuanan/teamsync-social-flow:${TAG} || \
-              docker pull prithuanan/teamsync-social-flow:latest
+            # kill any container exposing host port 3000
+            old=$(docker ps -q --filter "publish=3000")
+            if [ -n "$old" ]; then
+              docker rm -f $old
+            fi
 
-            # Replace the running container
-            docker rm -f frontend || true
+            # run fresh
             docker run -d \
               --name frontend \
               -p 3000:80 \
               prithuanan/teamsync-social-flow:${TAG}
+
 
