@@ -26,8 +26,8 @@ jobs:
             set -eux
 
             # go to the frontend app folder
-            mkdir -p ~/apps/teamsync-social-flow
-            cd ~/apps/teamsync-social-flow
+            mkdir -p ~/teamsync/teamsync-social-flow
+            cd ~/teamsync/teamsync-social-flow
 
             # clone or reset via HTTPS + token
             if [ ! -d .git ]; then
