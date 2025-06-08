@@ -1,0 +1,45 @@
+name: CI/CD → Frontend → Azure VM
+
+on:
+  push:
+    branches: [ "master" ]
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to VM
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host:     ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key:      ${{ secrets.SSH_KEY }}
+          port:     22
+          script: |
+            set -eux
+
+            # go to the frontend app folder
+            mkdir -p ~/apps/teamsync-social-flow
+            cd ~/apps/teamsync-social-flow
+
+            # clone or reset via HTTPS + token
+            if [ ! -d .git ]; then
+              git clone \
+                https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/prithu-anan/teamsync-social-flow.git .
+            else
+              git remote set-url origin \
+                https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/prithu-anan/teamsync-social-flow.git
+              git fetch origin master
+              git reset --hard origin/master
+            fi
+
+            # build & launch with Docker Compose
+            docker compose pull || true
+            docker compose up -d --build
