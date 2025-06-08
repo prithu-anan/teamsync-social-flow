@@ -2,7 +2,7 @@ name: CI/CD → Frontend → Azure VM
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "main" ]
 
 permissions:
   contents: read
@@ -36,8 +36,8 @@ jobs:
             else
               git remote set-url origin \
                 https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/prithu-anan/teamsync-social-flow.git
-              git fetch origin master
-              git reset --hard origin/master
+              git fetch origin main
+              git reset --hard origin/main
             fi
 
             # build & launch with Docker Compose
