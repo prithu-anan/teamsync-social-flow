@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import {
   Heart,
@@ -300,7 +299,7 @@ const SocialFeed = () => {
         </TabsList>
         <TabsContent value="all">
           {/* Create post */}
-          <Card className="mb-6">
+          <Card className="mb-6 backdrop-blur-sm bg-card/50 border-border/50">
             <CardHeader>
               <CardTitle className="text-lg">Create Post</CardTitle>
             </CardHeader>
@@ -320,7 +319,7 @@ const SocialFeed = () => {
                     placeholder="What's on your mind?"
                     value={newPostContent}
                     onChange={(e) => setNewPostContent(e.target.value)}
-                    className="mb-4"
+                    className="mb-4 backdrop-blur-sm bg-background/50"
                   />
                   <div className="flex justify-end">
                     <Button onClick={handleCreatePost}>Post</Button>
@@ -333,7 +332,7 @@ const SocialFeed = () => {
           {/* Post list */}
           <div className="space-y-6">
             {posts.map((post) => (
-              <Card key={post.id}>
+              <Card key={post.id} className="backdrop-blur-sm bg-card/50 border-border/50">
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-4">
@@ -367,7 +366,7 @@ const SocialFeed = () => {
                   <p className="whitespace-pre-line">{post.content}</p>
                   
                   {post.type === "event" && post.eventDate && (
-                    <div className="mt-4 p-4 bg-muted rounded-md">
+                    <div className="mt-4 p-4 bg-muted backdrop-blur-sm rounded-md">
                       <div className="flex items-center gap-3">
                         <Calendar className="h-8 w-8 text-teamsync-600" />
                         <div>
@@ -387,7 +386,7 @@ const SocialFeed = () => {
                   )}
                   
                   {post.type === "birthday" && (
-                    <div className="mt-4 p-4 bg-pink-50 dark:bg-pink-950/20 rounded-md">
+                    <div className="mt-4 p-4 bg-pink-50 backdrop-blur-sm rounded-md">
                       <div className="flex items-center gap-3">
                         <Cake className="h-8 w-8 text-pink-500" />
                         <div>
@@ -401,7 +400,7 @@ const SocialFeed = () => {
                   )}
                   
                   {post.type === "achievement" && (
-                    <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-950/20 rounded-md">
+                    <div className="mt-4 p-4 bg-amber-50 backdrop-blur-sm rounded-md">
                       <div className="flex items-center gap-3">
                         <Award className="h-8 w-8 text-amber-500" />
                         <div>
@@ -469,7 +468,7 @@ const SocialFeed = () => {
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex-1">
-                            <div className="bg-muted p-3 rounded-lg">
+                            <div className="bg-muted/50 backdrop-blur-sm p-3 rounded-lg">
                               <div className="font-medium text-sm">{comment.author.name}</div>
                               <p className="text-sm">{comment.content}</p>
                             </div>
@@ -498,21 +497,17 @@ const SocialFeed = () => {
                     <div className="flex-1 flex gap-2">
                       <Textarea
                         placeholder="Write a comment..."
-                        value={newComments[post.id] || ""}
+                        value={newComments[post.id] || ''}
                         onChange={(e) =>
                           setNewComments((prev) => ({
                             ...prev,
                             [post.id]: e.target.value,
                           }))
                         }
-                        className="min-h-[40px] text-sm"
+                        className="flex-1 backdrop-blur-sm bg-background/50"
                       />
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        onClick={() => handleAddComment(post.id)}
-                      >
-                        <Share2 className="h-4 w-4 rotate-90" />
+                      <Button size="sm" onClick={() => handleAddComment(post.id)}>
+                        Comment
                       </Button>
                     </div>
                   </div>
@@ -522,183 +517,475 @@ const SocialFeed = () => {
           </div>
         </TabsContent>
         <TabsContent value="events">
-          {posts
-            .filter((post) => post.type === "event")
-            .map((post) => (
-              <Card key={post.id} className="mb-6">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-4">
-                      <Avatar>
-                        <AvatarImage src={post.author.avatar} alt={post.author.name} />
+          <div className="space-y-6">
+            {posts
+              .filter((post) => post.type === "event")
+              .map((post) => (
+                <Card key={post.id} className="backdrop-blur-sm bg-card/50 border-border/50">
+                  <CardHeader className="pb-3">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-4">
+                        <Avatar>
+                          <AvatarImage src={post.author.avatar} alt={post.author.name} />
+                          <AvatarFallback>
+                            {post.author.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <CardTitle className="text-base">
+                            {post.author.name}
+                            {post.type !== "post" && (
+                              <Badge variant="outline" className="ml-2 px-2 py-0">
+                                <span className="flex items-center gap-1">
+                                  {getPostTypeIcon(post.type)}
+                                  {post.type.charAt(0).toUpperCase() + post.type.slice(1)}
+                                </span>
+                              </Badge>
+                            )}
+                          </CardTitle>
+                          <CardDescription>{formatDate(post.timestamp)}</CardDescription>
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pb-3">
+                    <p className="whitespace-pre-line">{post.content}</p>
+                    
+                    {post.type === "event" && post.eventDate && (
+                      <div className="mt-4 p-4 bg-muted backdrop-blur-sm rounded-md">
+                        <div className="flex items-center gap-3">
+                          <Calendar className="h-8 w-8 text-teamsync-600" />
+                          <div>
+                            <h3 className="font-medium">{post.eventTitle}</h3>
+                            <p className="text-sm text-muted-foreground">
+                              {formatEventDate(post.eventDate)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex justify-end">
+                          <Button variant="outline" size="sm">
+                            <Calendar className="h-3 w-3 mr-2" />
+                            Add to Calendar
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {post.image && (
+                      <div className="mt-4">
+                        <img
+                          src={post.image}
+                          alt="Post attachment"
+                          className="rounded-md max-h-96 w-full object-cover"
+                        />
+                      </div>
+                    )}
+                  </CardContent>
+                  <CardFooter className="flex flex-col border-t pt-3">
+                    <div className="flex justify-between items-center w-full mb-3">
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <ThumbsUp className="h-4 w-4" />
+                        <span>{post.likes}</span>
+                      </div>
+                      <div className="text-muted-foreground text-sm">
+                        {post.comments.length} comments
+                      </div>
+                    </div>
+                    <div className="flex justify-between w-full border-t pt-3">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleLikePost(post.id)}
+                      >
+                        <ThumbsUp className={`h-4 w-4 mr-2 ${likedPosts[post.id] ? 'text-teamsync-600 fill-teamsync-600' : ''}`} />
+                        Like
+                      </Button>
+                      <Button variant="ghost" size="sm" className="flex-1">
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        Comment
+                      </Button>
+                      <Button variant="ghost" size="sm" className="flex-1">
+                        <Share2 className="h-4 w-4 mr-2" />
+                        Share
+                      </Button>
+                    </div>
+                    
+                    {/* Comments */}
+                    {post.comments.length > 0 && (
+                      <div className="w-full mt-4 space-y-3">
+                        {post.comments.map((comment) => (
+                          <div key={comment.id} className="flex gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={comment.author.avatar} alt={comment.author.name} />
+                              <AvatarFallback>
+                                {comment.author.name
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .join("")}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <div className="bg-muted/50 backdrop-blur-sm p-3 rounded-lg">
+                                <div className="font-medium text-sm">{comment.author.name}</div>
+                                <p className="text-sm">{comment.content}</p>
+                              </div>
+                              <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
+                                <span>{formatDate(comment.timestamp)}</span>
+                                <button className="hover:text-foreground">Like</button>
+                                <button className="hover:text-foreground">Reply</button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Add comment */}
+                    <div className="flex gap-3 w-full mt-4">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={user?.avatar} alt={user?.name} />
                         <AvatarFallback>
-                          {post.author.name
+                          {user?.name
                             .split(" ")
                             .map((n) => n[0])
                             .join("")}
                         </AvatarFallback>
                       </Avatar>
-                      <div>
-                        <CardTitle className="text-base">{post.author.name}</CardTitle>
-                        <CardDescription>{formatDate(post.timestamp)}</CardDescription>
-                      </div>
-                    </div>
-                    <Badge variant="outline">
-                      <Calendar className="h-3 w-3 mr-1" />
-                      Event
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p>{post.content}</p>
-                  
-                  {post.eventDate && (
-                    <div className="mt-4 p-4 bg-muted rounded-md">
-                      <div className="flex items-center gap-3">
-                        <Calendar className="h-8 w-8 text-teamsync-600" />
-                        <div>
-                          <h3 className="font-medium">{post.eventTitle}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {formatEventDate(post.eventDate)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="mt-3 flex justify-end">
-                        <Button variant="outline" size="sm">
-                          <Calendar className="h-3 w-3 mr-2" />
-                          Add to Calendar
+                      <div className="flex-1 flex gap-2">
+                        <Textarea
+                          placeholder="Write a comment..."
+                          value={newComments[post.id] || ''}
+                          onChange={(e) =>
+                            setNewComments((prev) => ({
+                              ...prev,
+                              [post.id]: e.target.value,
+                            }))
+                          }
+                          className="flex-1 backdrop-blur-sm bg-background/50"
+                        />
+                        <Button size="sm" onClick={() => handleAddComment(post.id)}>
+                          Comment
                         </Button>
                       </div>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          {posts.filter((post) => post.type === "event").length === 0 && (
-            <div className="text-center py-8">
-              <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-              <h3 className="text-lg font-medium">No Events</h3>
-              <p className="text-muted-foreground">
-                There are no upcoming events yet.
-              </p>
-              <Button className="mt-4">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Event
-              </Button>
-            </div>
-          )}
+                  </CardFooter>
+                </Card>
+              ))}
+          </div>
         </TabsContent>
         <TabsContent value="birthdays">
-          {posts
-            .filter((post) => post.type === "birthday")
-            .map((post) => (
-              <Card key={post.id} className="mb-6">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-4">
-                      <Avatar>
-                        <AvatarImage src={post.author.avatar} alt={post.author.name} />
+          <div className="space-y-6">
+            {posts
+              .filter((post) => post.type === "birthday")
+              .map((post) => (
+                <Card key={post.id} className="backdrop-blur-sm bg-card/50 border-border/50">
+                  <CardHeader className="pb-3">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-4">
+                        <Avatar>
+                          <AvatarImage src={post.author.avatar} alt={post.author.name} />
+                          <AvatarFallback>
+                            {post.author.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <CardTitle className="text-base">
+                            {post.author.name}
+                            {post.type !== "post" && (
+                              <Badge variant="outline" className="ml-2 px-2 py-0">
+                                <span className="flex items-center gap-1">
+                                  {getPostTypeIcon(post.type)}
+                                  {post.type.charAt(0).toUpperCase() + post.type.slice(1)}
+                                </span>
+                              </Badge>
+                            )}
+                          </CardTitle>
+                          <CardDescription>{formatDate(post.timestamp)}</CardDescription>
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pb-3">
+                    <p className="whitespace-pre-line">{post.content}</p>
+                    
+                    {post.type === "birthday" && (
+                      <div className="mt-4 p-4 bg-pink-50 backdrop-blur-sm rounded-md">
+                        <div className="flex items-center gap-3">
+                          <Cake className="h-8 w-8 text-pink-500" />
+                          <div>
+                            <h3 className="font-medium">Happy Birthday! 🎉</h3>
+                            <p className="text-sm text-muted-foreground">
+                              Celebrate with the team
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {post.image && (
+                      <div className="mt-4">
+                        <img
+                          src={post.image}
+                          alt="Post attachment"
+                          className="rounded-md max-h-96 w-full object-cover"
+                        />
+                      </div>
+                    )}
+                  </CardContent>
+                  <CardFooter className="flex flex-col border-t pt-3">
+                    <div className="flex justify-between items-center w-full mb-3">
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <ThumbsUp className="h-4 w-4" />
+                        <span>{post.likes}</span>
+                      </div>
+                      <div className="text-muted-foreground text-sm">
+                        {post.comments.length} comments
+                      </div>
+                    </div>
+                    <div className="flex justify-between w-full border-t pt-3">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleLikePost(post.id)}
+                      >
+                        <ThumbsUp className={`h-4 w-4 mr-2 ${likedPosts[post.id] ? 'text-teamsync-600 fill-teamsync-600' : ''}`} />
+                        Like
+                      </Button>
+                      <Button variant="ghost" size="sm" className="flex-1">
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        Comment
+                      </Button>
+                      <Button variant="ghost" size="sm" className="flex-1">
+                        <Share2 className="h-4 w-4 mr-2" />
+                        Share
+                      </Button>
+                    </div>
+                    
+                    {/* Comments */}
+                    {post.comments.length > 0 && (
+                      <div className="w-full mt-4 space-y-3">
+                        {post.comments.map((comment) => (
+                          <div key={comment.id} className="flex gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={comment.author.avatar} alt={comment.author.name} />
+                              <AvatarFallback>
+                                {comment.author.name
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .join("")}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <div className="bg-muted/50 backdrop-blur-sm p-3 rounded-lg">
+                                <div className="font-medium text-sm">{comment.author.name}</div>
+                                <p className="text-sm">{comment.content}</p>
+                              </div>
+                              <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
+                                <span>{formatDate(comment.timestamp)}</span>
+                                <button className="hover:text-foreground">Like</button>
+                                <button className="hover:text-foreground">Reply</button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Add comment */}
+                    <div className="flex gap-3 w-full mt-4">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={user?.avatar} alt={user?.name} />
                         <AvatarFallback>
-                          {post.author.name
+                          {user?.name
                             .split(" ")
                             .map((n) => n[0])
                             .join("")}
                         </AvatarFallback>
                       </Avatar>
-                      <div>
-                        <CardTitle className="text-base">{post.author.name}</CardTitle>
-                        <CardDescription>{formatDate(post.timestamp)}</CardDescription>
+                      <div className="flex-1 flex gap-2">
+                        <Textarea
+                          placeholder="Write a comment..."
+                          value={newComments[post.id] || ''}
+                          onChange={(e) =>
+                            setNewComments((prev) => ({
+                              ...prev,
+                              [post.id]: e.target.value,
+                            }))
+                          }
+                          className="flex-1 backdrop-blur-sm bg-background/50"
+                        />
+                        <Button size="sm" onClick={() => handleAddComment(post.id)}>
+                          Comment
+                        </Button>
                       </div>
                     </div>
-                    <Badge variant="outline" className="bg-pink-50 text-pink-500 hover:bg-pink-100">
-                      <Cake className="h-3 w-3 mr-1" />
-                      Birthday
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p>{post.content}</p>
-                  <div className="mt-4 p-4 bg-pink-50 dark:bg-pink-950/20 rounded-md">
-                    <div className="flex items-center gap-3">
-                      <Cake className="h-8 w-8 text-pink-500" />
-                      <div>
-                        <h3 className="font-medium">Happy Birthday! 🎉</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Celebrate with the team
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          {posts.filter((post) => post.type === "birthday").length === 0 && (
-            <div className="text-center py-8">
-              <Cake className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-              <h3 className="text-lg font-medium">No Birthdays</h3>
-              <p className="text-muted-foreground">
-                There are no birthdays to celebrate at the moment.
-              </p>
-            </div>
-          )}
+                  </CardFooter>
+                </Card>
+              ))}
+          </div>
         </TabsContent>
         <TabsContent value="achievements">
-          {posts
-            .filter((post) => post.type === "achievement")
-            .map((post) => (
-              <Card key={post.id} className="mb-6">
-                <CardHeader>
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-4">
-                      <Avatar>
-                        <AvatarImage src={post.author.avatar} alt={post.author.name} />
+          <div className="space-y-6">
+            {posts
+              .filter((post) => post.type === "achievement")
+              .map((post) => (
+                <Card key={post.id} className="backdrop-blur-sm bg-card/50 border-border/50">
+                  <CardHeader className="pb-3">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-4">
+                        <Avatar>
+                          <AvatarImage src={post.author.avatar} alt={post.author.name} />
+                          <AvatarFallback>
+                            {post.author.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <CardTitle className="text-base">
+                            {post.author.name}
+                            {post.type !== "post" && (
+                              <Badge variant="outline" className="ml-2 px-2 py-0">
+                                <span className="flex items-center gap-1">
+                                  {getPostTypeIcon(post.type)}
+                                  {post.type.charAt(0).toUpperCase() + post.type.slice(1)}
+                                </span>
+                              </Badge>
+                            )}
+                          </CardTitle>
+                          <CardDescription>{formatDate(post.timestamp)}</CardDescription>
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pb-3">
+                    <p className="whitespace-pre-line">{post.content}</p>
+                    
+                    {post.type === "achievement" && (
+                      <div className="mt-4 p-4 bg-amber-50 backdrop-blur-sm rounded-md">
+                        <div className="flex items-center gap-3">
+                          <Award className="h-8 w-8 text-amber-500" />
+                          <div>
+                            <h3 className="font-medium">Team Achievement 🏆</h3>
+                            <p className="text-sm text-muted-foreground">
+                              Congratulations on this milestone!
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {post.image && (
+                      <div className="mt-4">
+                        <img
+                          src={post.image}
+                          alt="Post attachment"
+                          className="rounded-md max-h-96 w-full object-cover"
+                        />
+                      </div>
+                    )}
+                  </CardContent>
+                  <CardFooter className="flex flex-col border-t pt-3">
+                    <div className="flex justify-between items-center w-full mb-3">
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <ThumbsUp className="h-4 w-4" />
+                        <span>{post.likes}</span>
+                      </div>
+                      <div className="text-muted-foreground text-sm">
+                        {post.comments.length} comments
+                      </div>
+                    </div>
+                    <div className="flex justify-between w-full border-t pt-3">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleLikePost(post.id)}
+                      >
+                        <ThumbsUp className={`h-4 w-4 mr-2 ${likedPosts[post.id] ? 'text-teamsync-600 fill-teamsync-600' : ''}`} />
+                        Like
+                      </Button>
+                      <Button variant="ghost" size="sm" className="flex-1">
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        Comment
+                      </Button>
+                      <Button variant="ghost" size="sm" className="flex-1">
+                        <Share2 className="h-4 w-4 mr-2" />
+                        Share
+                      </Button>
+                    </div>
+                    
+                    {/* Comments */}
+                    {post.comments.length > 0 && (
+                      <div className="w-full mt-4 space-y-3">
+                        {post.comments.map((comment) => (
+                          <div key={comment.id} className="flex gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={comment.author.avatar} alt={comment.author.name} />
+                              <AvatarFallback>
+                                {comment.author.name
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .join("")}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <div className="bg-muted/50 backdrop-blur-sm p-3 rounded-lg">
+                                <div className="font-medium text-sm">{comment.author.name}</div>
+                                <p className="text-sm">{comment.content}</p>
+                              </div>
+                              <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
+                                <span>{formatDate(comment.timestamp)}</span>
+                                <button className="hover:text-foreground">Like</button>
+                                <button className="hover:text-foreground">Reply</button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Add comment */}
+                    <div className="flex gap-3 w-full mt-4">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={user?.avatar} alt={user?.name} />
                         <AvatarFallback>
-                          {post.author.name
+                          {user?.name
                             .split(" ")
                             .map((n) => n[0])
                             .join("")}
                         </AvatarFallback>
                       </Avatar>
-                      <div>
-                        <CardTitle className="text-base">{post.author.name}</CardTitle>
-                        <CardDescription>{formatDate(post.timestamp)}</CardDescription>
+                      <div className="flex-1 flex gap-2">
+                        <Textarea
+                          placeholder="Write a comment..."
+                          value={newComments[post.id] || ''}
+                          onChange={(e) =>
+                            setNewComments((prev) => ({
+                              ...prev,
+                              [post.id]: e.target.value,
+                            }))
+                          }
+                          className="flex-1 backdrop-blur-sm bg-background/50"
+                        />
+                        <Button size="sm" onClick={() => handleAddComment(post.id)}>
+                          Comment
+                        </Button>
                       </div>
                     </div>
-                    <Badge variant="outline" className="bg-amber-50 text-amber-500 hover:bg-amber-100">
-                      <Award className="h-3 w-3 mr-1" />
-                      Achievement
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <p>{post.content}</p>
-                  <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-950/20 rounded-md">
-                    <div className="flex items-center gap-3">
-                      <Award className="h-8 w-8 text-amber-500" />
-                      <div>
-                        <h3 className="font-medium">Team Achievement 🏆</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Congratulations on this milestone!
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          {posts.filter((post) => post.type === "achievement").length === 0 && (
-            <div className="text-center py-8">
-              <Award className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-              <h3 className="text-lg font-medium">No Achievements</h3>
-              <p className="text-muted-foreground">
-                No achievements have been posted yet.
-              </p>
-              <Button className="mt-4">
-                <Plus className="h-4 w-4 mr-2" />
-                Share an Achievement
-              </Button>
-            </div>
-          )}
+                  </CardFooter>
+                </Card>
+              ))}
+          </div>
         </TabsContent>
       </Tabs>
     </div>

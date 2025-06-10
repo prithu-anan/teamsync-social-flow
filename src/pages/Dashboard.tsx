@@ -230,7 +230,7 @@ const Dashboard = () => {
 
       {/* Stats cards */}
       <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="backdrop-blur-sm bg-card/50 border-border/50">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
           </CardHeader>
@@ -242,7 +242,7 @@ const Dashboard = () => {
             <Progress className="mt-2" value={progress} />
           </CardContent>
         </Card>
-        <Card>
+        <Card className="backdrop-blur-sm bg-card/50 border-border/50">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Projects</CardTitle>
           </CardHeader>
@@ -264,7 +264,7 @@ const Dashboard = () => {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="backdrop-blur-sm bg-card/50 border-border/50">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Upcoming</CardTitle>
           </CardHeader>
@@ -284,7 +284,7 @@ const Dashboard = () => {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="backdrop-blur-sm bg-card/50 border-border/50">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium">Team Members</CardTitle>
           </CardHeader>
@@ -304,7 +304,7 @@ const Dashboard = () => {
       {/* Main content */}
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
         {/* Tasks section */}
-        <Card className="lg:col-span-2">
+        <Card className="lg:col-span-2 backdrop-blur-sm bg-card/50 border-border/50">
           <CardHeader>
             <CardTitle>My Tasks</CardTitle>
             <CardDescription>Manage your upcoming tasks</CardDescription>
@@ -411,7 +411,7 @@ const Dashboard = () => {
         </Card>
 
         {/* Events section */}
-        <Card>
+        <Card className="backdrop-blur-sm bg-card/50 border-border/50">
           <CardHeader>
             <CardTitle>Upcoming Events</CardTitle>
             <CardDescription>Schedule for the next 30 days</CardDescription>
@@ -456,7 +456,7 @@ const Dashboard = () => {
         <h2 className="text-xl font-semibold mb-4">Active Projects</h2>
         <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
           {projects.map((project) => (
-            <Card key={project.id}>
+            <Card key={project.id} className="backdrop-blur-sm bg-card/50 border-border/50">
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <CardTitle>{project.name}</CardTitle>

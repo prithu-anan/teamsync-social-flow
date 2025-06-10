@@ -7,7 +7,8 @@ import {
   Settings,
   MessageCircle,
   Bell,
-  PenTool
+  PenTool,
+  FolderKanban
 } from "lucide-react";
 import {
   Sidebar,
@@ -40,6 +41,11 @@ const AppSidebar = () => {
           title: "Dashboard",
           icon: LayoutDashboard,
           path: "/",
+        },
+        {
+          title: "My Projects",
+          icon: FolderKanban,
+          path: "/projects",
         },
         {
           title: "Kanban Board",

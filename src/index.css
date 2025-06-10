@@ -185,12 +185,12 @@
   /* Remove previous bg-yellow-50 etc. */
   @apply border p-4 rounded-lg shadow-md hover:shadow-lg transition-all;
   background-image: none;
-  transform: rotate(-1deg);
+  /* transform: rotate(-1deg); */ /* Removed incline effect */
   transition: transform 0.2s cubic-bezier(0.4,0,0.2,1), box-shadow 0.2s;
 }
 
 .task-card:hover {
-  transform: rotate(0deg) scale(1.03);
+  transform: scale(1.03); /* Removed rotate, kept scale */
 }
 
 .task-card.dragging {
