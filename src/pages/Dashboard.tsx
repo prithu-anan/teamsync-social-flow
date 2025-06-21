@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { Check, Calendar, Users, Clock } from "lucide-react";
+import { Check, Calendar, Users, Clock, ArrowRight } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -145,8 +145,9 @@ const mockEvents: Event[] = [
 const Dashboard = () => {
   const { user } = useAuth();
   const [progress, setProgress] = useState(0);
-  // const [tasks, setTasks] = useState<Task[]>(mockTasks);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [activeTasks, setActiveTasks] = useState<Task[]>([]);
+  const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(true);
   const [projects, setProjects] = useState<Project[]>(mockProjects);
   const [events, setEvents] = useState<Event[]>(mockEvents);
 
@@ -158,53 +159,50 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
-    const fetchTasks = async () => {
-      const data = await getTasks();
-      if (!data.error) {
-        // Handle different response structures
-        let tasksData = data;
-        if (data && typeof data === 'object' && !Array.isArray(data)) {
-          // If data is an object, check for common properties
-          if (data.data && Array.isArray(data.data)) {
-            tasksData = data.data;
-          } else if (data.tasks && Array.isArray(data.tasks)) {
-            tasksData = data.tasks;
-          } else if (data.items && Array.isArray(data.items)) {
-            tasksData = data.items;
+    const fetchAndProcessTasks = async () => {
+      setLoadingTasks(true);
+      try {
+        const response = await getTasks();
+        if (response && !response.error) {
+          const tasksData = response.tasks || response.data || response;
+          if (Array.isArray(tasksData)) {
+            const allTasks = tasksData.map(task => ({
+              id: task.id.toString(),
+              title: task.title,
+              status: task.status?.toLowerCase().replace('_', '-') || 'todo',
+              priority: task.priority || "low",
+              assignee: {
+                name: task.assignedTo?.name || "Unknown",
+                avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assignedTo?.name || "U")}`,
+              },
+              dueDate: task.deadline || new Date().toISOString(), // fallback to today if null
+            }));
+
+            const active = allTasks.filter(t => t.status === 'todo' || t.status === 'in-progress' || t.status === 'in-review');
+            const completed = allTasks.filter(t => t.status === 'completed');
+
+            setActiveTasks(active);
+            setCompletedTasks(completed);
           } else {
-            // If we can't find an array, use empty array
-            console.log("Tasks API response structure:", data);
-            setTasks([]);
-            return;
+            console.log("Tasks data is not an array:", tasksData);
+            setActiveTasks([]);
+            setCompletedTasks([]);
           }
+        } else {
+          console.error(response.error);
+          setActiveTasks([]);
+          setCompletedTasks([]);
         }
-
-        // Ensure we have an array
-        if (!Array.isArray(tasksData)) {
-          console.log("Tasks data is not an array:", tasksData);
-          setTasks([]);
-          return;
-        }
-
-        const transformedTasks = tasksData.map((task: any) => ({
-          id: task.id.toString(),
-          title: task.title,
-          status: task.status === "done" ? "done" : task.status === "in_progress" ? "in-progress" : "todo",
-          priority: task.priority || "low",
-          assignee: {
-            name: task.assignedTo?.name || "Unknown",
-            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assignedTo?.name || "U")}`,
-          },
-          dueDate: task.deadline || new Date().toISOString(), // fallback to today if null
-        }));
-        setTasks(transformedTasks);
-      } else {
-        console.error(data.error);
-        setTasks([]);
+      } catch (err) {
+        console.error(err);
+        setActiveTasks([]);
+        setCompletedTasks([]);
+      } finally {
+        setLoadingTasks(false);
       }
     };
 
-    fetchTasks();
+    fetchAndProcessTasks();
   }, []);
 
   const formatDate = (dateString: string) => {
@@ -261,9 +259,9 @@ const Dashboard = () => {
             <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{tasks.length}</div>
+            <div className="text-2xl font-bold">{activeTasks.length + completedTasks.length}</div>
             <p className="text-xs text-muted-foreground">
-              {tasks.filter((t) => t.status === "done").length} completed
+              {completedTasks.length} completed
             </p>
             <Progress className="mt-2" value={progress} />
           </CardContent>
@@ -330,10 +328,15 @@ const Dashboard = () => {
       {/* Main content */}
       <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
         {/* Tasks section */}
-        <Card className="lg:col-span-2 backdrop-blur-sm bg-card/50 border-border/50">
-          <CardHeader>
+        <Card className="col-span-1 lg:col-span-2 backdrop-blur-sm bg-card/50 border-border/50">
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>My Tasks</CardTitle>
-            <CardDescription>Manage your upcoming tasks</CardDescription>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/kanban">
+                View all
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Link>
+            </Button>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="active">
@@ -341,10 +344,11 @@ const Dashboard = () => {
                 <TabsTrigger value="active">Active</TabsTrigger>
                 <TabsTrigger value="completed">Completed</TabsTrigger>
               </TabsList>
-              <TabsContent value="active" className="space-y-4 mt-4">
-                {tasks
-                  .filter((task) => task.status !== "done")
-                  .map((task) => (
+              <TabsContent value="active" className="space-y-4 pt-4">
+                {loadingTasks ? (
+                  <p>Loading...</p>
+                ) : activeTasks.length > 0 ? (
+                  activeTasks.slice(0, 2).map(task => (
                     <div
                       key={task.id}
                       className="task-card flex items-center justify-between"
@@ -388,12 +392,16 @@ const Dashboard = () => {
                         </Avatar>
                       </div>
                     </div>
-                  ))}
+                  ))
+                ) : (
+                  <p className="text-muted-foreground text-sm">No active tasks.</p>
+                )}
               </TabsContent>
-              <TabsContent value="completed" className="space-y-4 mt-4">
-                {tasks
-                  .filter((task) => task.status === "done")
-                  .map((task) => (
+              <TabsContent value="completed" className="space-y-4 pt-4">
+                {loadingTasks ? (
+                  <p>Loading...</p>
+                ) : completedTasks.length > 0 ? (
+                  completedTasks.slice(0, 2).map(task => (
                     <div
                       key={task.id}
                       className="task-card flex items-center justify-between"
@@ -425,15 +433,13 @@ const Dashboard = () => {
                         </Avatar>
                       </div>
                     </div>
-                  ))}
+                  ))
+                ) : (
+                  <p className="text-muted-foreground text-sm">No completed tasks yet.</p>
+                )}
               </TabsContent>
             </Tabs>
           </CardContent>
-          <CardFooter>
-            <Button variant="outline" asChild className="w-full">
-              <Link to="/kanban">View All Tasks</Link>
-            </Button>
-          </CardFooter>
         </Card>
 
         {/* Events section */}

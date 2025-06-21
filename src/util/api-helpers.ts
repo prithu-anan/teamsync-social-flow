@@ -308,22 +308,13 @@ export const sendMessage = async (channelId, req) => {
     }
 }
 
-export const editMessage = async (channelId, messageId, req) => {
+export const editMessage = async (channelId, messageId, message) => {
     const token = localStorage.getItem("teamsync_jwt");
 
-    /**
-    {
-        "sender_id": 1,
-        "channel_id": 1,
-        "recipient_id": null,
-        "content": "Ending module",
-        "timestamp": "2025-06-04T10:04:58.797Z",
-        "thread_parent_id": null
-    }
-    */
-
     try {
-        const res = await axios.put(`${API_BASE_URL}/channels/${channelId}/messages/${messageId}`, { content: req.content }, {
+        // The backend expects the full message object for an update.
+        console.log("Editing message with body:", message);
+        const res = await axios.put(`${API_BASE_URL}/channels/${channelId}/messages/${messageId}`, message, {
             headers: {
                 Authorization: `Bearer ${token}`,
             },
@@ -334,7 +325,8 @@ export const editMessage = async (channelId, messageId, req) => {
         }
     } catch (err) {
         if (err.response) {
-            return { error: err.response.data || "Failed to edit message" };
+            console.error("Edit message error:", err.response.data);
+            return { error: err.response.data?.message || err.response.data || "Failed to edit message" };
         }
     }
 }

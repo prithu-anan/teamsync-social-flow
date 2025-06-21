@@ -14,7 +14,9 @@ import {
   getChannels, 
   getMessages, 
   sendMessage,
-  getUsers
+  getUsers,
+  editMessage,
+  deleteMessage
 } from "@/util/api-helpers";
 import { toast } from "@/components/ui/use-toast";
 
@@ -338,6 +340,56 @@ const Messages = () => {
   };
 
   const sendMessageHandler = async (msg: Partial<Message>) => {
+    if (msg.updateType === 'edit' && msg.id && msg.content) {
+      const messageToEdit = allMessages.find(m => m.id === msg.id);
+      if (!messageToEdit) {
+        toast({ title: "Error", description: "Could not find the message to edit.", variant: "destructive" });
+        return;
+      }
+      
+      // Construct a clean object with only the fields the backend expects for an update.
+      const updatePayload = {
+        sender_id: parseInt(messageToEdit.sender_id, 10),
+        channel_id: selectedChannel?.id ? parseInt(selectedChannel.id, 10) : null,
+        recipient_id: messageToEdit.recipient_id ? parseInt(messageToEdit.recipient_id, 10) : null,
+        content: msg.content,
+        timestamp: messageToEdit.timestamp, // Keep the original timestamp
+        thread_parent_id: messageToEdit.thread_parent_id ? parseInt(messageToEdit.thread_parent_id, 10) : null
+      };
+
+      try {
+        const response = await editMessage(selectedChannel.channel_id, msg.id, updatePayload);
+        if (response && !response.error) {
+          // Optimistically update the UI with the new content
+          const updatedMessageInState = { ...messageToEdit, content: msg.content };
+          setAllMessages(prev => prev.map(m => 
+            m.id === msg.id ? updatedMessageInState : m
+          ));
+          toast({ title: "Message updated" });
+        } else {
+          toast({ title: "Error", description: response?.error || "Failed to update message", variant: "destructive" });
+        }
+      } catch (error) {
+        toast({ title: "Error", description: "An error occurred while editing.", variant: "destructive" });
+      }
+      return;
+    }
+
+    if (msg.updateType === 'delete' && msg.id) {
+      try {
+        const response = await deleteMessage(selectedChannel.channel_id, msg.id);
+        if (response && !response.error) {
+          setAllMessages(prev => prev.filter(m => m.id !== msg.id));
+          toast({ title: "Message deleted" });
+        } else {
+          toast({ title: "Error", description: "Failed to delete message", variant: "destructive" });
+        }
+      } catch (error) {
+        toast({ title: "Error", description: "An error occurred while deleting.", variant: "destructive" });
+      }
+      return;
+    }
+
     if (!selectedChannel) return;
 
     // Debug logging

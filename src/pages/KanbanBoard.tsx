@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Check, Clock, Plus, Filter } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,9 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+import { getTasks } from "@/util/api-helpers";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/components/ui/use-toast";
 
 interface KanbanTask {
   id: string;
@@ -30,121 +33,6 @@ interface KanbanTask {
   attachments?: number;
 }
 
-// Sample tasks data
-const initialTasks: KanbanTask[] = [
-  {
-    id: "task1",
-    title: "Design new dashboard wireframes",
-    description: "Create wireframes for the new dashboard layout",
-    status: "todo",
-    priority: "high",
-    assignee: {
-      name: "John Doe",
-      avatar: "https://ui-avatars.com/api/?name=John+Doe&background=0D8ABC&color=fff",
-    },
-    dueDate: "2025-05-20",
-    tags: ["design", "ui/ux"],
-    comments: 3,
-    attachments: 2,
-  },
-  {
-    id: "task2",
-    title: "Fix navigation responsiveness on mobile",
-    description: "Address issues with the navigation menu on small screens",
-    status: "in-progress",
-    priority: "medium",
-    assignee: {
-      name: "Jane Smith",
-      avatar: "https://ui-avatars.com/api/?name=Jane+Smith&background=0D9488&color=fff",
-    },
-    dueDate: "2025-05-15",
-    tags: ["bug", "mobile"],
-    comments: 5,
-  },
-  {
-    id: "task3",
-    title: "Implement authentication flow",
-    description: "Add login, registration and forgot password functionality",
-    status: "in-progress",
-    priority: "high",
-    assignee: {
-      name: "Mike Johnson",
-      avatar: "https://ui-avatars.com/api/?name=Mike+Johnson&background=8B5CF6&color=fff",
-    },
-    dueDate: "2025-05-18",
-    tags: ["feature", "backend"],
-  },
-  {
-    id: "task4",
-    title: "Write API documentation",
-    description: "Document all endpoints for the new API",
-    status: "review",
-    priority: "medium",
-    assignee: {
-      name: "John Doe",
-      avatar: "https://ui-avatars.com/api/?name=John+Doe&background=0D8ABC&color=fff",
-    },
-    dueDate: "2025-05-16",
-    tags: ["documentation"],
-    comments: 2,
-  },
-  {
-    id: "task5",
-    title: "Design system improvements",
-    description: "Update color scheme and component library",
-    status: "done",
-    priority: "low",
-    assignee: {
-      name: "Jane Smith",
-      avatar: "https://ui-avatars.com/api/?name=Jane+Smith&background=0D9488&color=fff",
-    },
-    tags: ["design", "ui/ux"],
-    comments: 8,
-    attachments: 3,
-  },
-  {
-    id: "task6",
-    title: "Database optimization",
-    description: "Improve query performance for user dashboard",
-    status: "todo",
-    priority: "high",
-    assignee: {
-      name: "Mike Johnson",
-      avatar: "https://ui-avatars.com/api/?name=Mike+Johnson&background=8B5CF6&color=fff",
-    },
-    dueDate: "2025-05-25",
-    tags: ["backend", "performance"],
-  },
-  {
-    id: "task7",
-    title: "User testing session",
-    description: "Conduct user testing for new features",
-    status: "todo",
-    priority: "medium",
-    assignee: {
-      name: "Jane Smith",
-      avatar: "https://ui-avatars.com/api/?name=Jane+Smith&background=0D9488&color=fff",
-    },
-    dueDate: "2025-05-22",
-    tags: ["research", "ux"],
-    comments: 1,
-  },
-  {
-    id: "task8",
-    title: "Cloud infrastructure setup",
-    description: "Set up new cloud server architecture",
-    status: "done",
-    priority: "high",
-    assignee: {
-      name: "Mike Johnson",
-      avatar: "https://ui-avatars.com/api/?name=Mike+Johnson&background=8B5CF6&color=fff",
-    },
-    tags: ["devops", "infrastructure"],
-    comments: 4,
-    attachments: 1,
-  },
-];
-
 const stickyColors = [
   'sticky-yellow',
   'sticky-green',
@@ -154,18 +42,18 @@ const stickyColors = [
   'sticky-purple',
 ];
 
-const columnOrder = ["todo", "in-progress", "review", "done"];
+const columnOrder = ["todo", "in_progress", "in_review", "completed"];
 const columnNames: Record<string, string> = {
   "todo": "To Do",
-  "in-progress": "In Progress",
-  "review": "Review",
-  "done": "Done"
+  "in_progress": "In Progress",
+  "in_review": "In Review",
+  "completed": "Completed"
 };
 const columnColors: Record<string, string> = {
   "todo": "bg-gray-400",
-  "in-progress": "bg-blue-500",
-  "review": "bg-amber-500",
-  "done": "bg-green-500"
+  "in_progress": "bg-blue-500",
+  "in_review": "bg-amber-500",
+  "completed": "bg-green-500"
 };
 
 function groupTasksByStatus(tasks: KanbanTask[]) {
@@ -176,8 +64,67 @@ function groupTasksByStatus(tasks: KanbanTask[]) {
 }
 
 const KanbanBoard = () => {
-  const [tasks, setTasks] = useState<KanbanTask[]>(initialTasks);
-  const [columns, setColumns] = useState(() => groupTasksByStatus(initialTasks));
+  const { user } = useAuth();
+  const [tasks, setTasks] = useState<KanbanTask[]>([]);
+  const [columns, setColumns] = useState<Record<string, KanbanTask[]>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchTasks = async () => {
+      if (!user) {
+        setLoading(false);
+        setError("You must be logged in to view tasks.");
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const response = await getTasks();
+
+        if (response.error) {
+          toast({ title: "Error", description: response.error, variant: "destructive" });
+          setError("Failed to fetch tasks.");
+          setTasks([]);
+        } else {
+          // The API response might be an object with a 'tasks' or 'data' key
+          const tasksData = response.tasks || response.data || response;
+          if (Array.isArray(tasksData)) {
+            // Map the backend response to the KanbanTask interface
+            const formattedTasks = tasksData.map(task => ({
+              id: task.id.toString(),
+              title: task.title,
+              description: task.description,
+              status: task.status?.toLowerCase().replace(/\s+/g, '-') || 'todo',
+              priority: task.priority?.toLowerCase() || 'medium',
+              assignee: task.assignee ? {
+                name: task.assignee.name,
+                avatar: task.assignee.profile_picture || `https://ui-avatars.com/api/?name=${task.assignee.name.replace(/\s+/g, '+')}&background=random`
+              } : undefined,
+              dueDate: task.due_date,
+              tags: task.tags || [],
+              comments: task.comments_count || 0,
+              attachments: task.attachments_count || 0,
+            }));
+            setTasks(formattedTasks);
+            setColumns(groupTasksByStatus(formattedTasks));
+          } else {
+            console.error("Fetched tasks data is not an array:", tasksData);
+            setError("Received an invalid format for tasks.");
+            setTasks([]);
+          }
+        }
+      } catch (err) {
+        console.error("An error occurred while fetching tasks:", err);
+        setError("An unexpected error occurred.");
+        setTasks([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTasks();
+  }, [user]);
 
   // Get color based on priority
   const getPriorityColor = (priority: string) => {
@@ -235,6 +182,23 @@ const KanbanBoard = () => {
       });
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <p>Loading tasks...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-red-500">
+        <h2 className="text-xl font-semibold">Error</h2>
+        <p>{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

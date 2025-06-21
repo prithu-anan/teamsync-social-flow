@@ -19,7 +19,7 @@ interface MessageThreadProps {
   pinnedMessages: Message[];
   onPinMessage: (msg: Message) => void;
   onUnpinMessage: (msg: Message) => void;
-  sendMessage: (msg: Partial<Message>) => void;
+  sendMessage: (msg: Partial<Message> & { updateType?: 'reaction' | 'new' | 'edit' | 'delete' }) => void;
 }
 
 const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMessages, onPinMessage, onUnpinMessage, sendMessage }: MessageThreadProps) => {
@@ -134,6 +134,21 @@ const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMes
     });
   };
 
+  const handleEditMessage = (messageId: string, newContent: string) => {
+    sendMessage({
+      id: messageId,
+      content: newContent,
+      updateType: 'edit'
+    });
+  };
+
+  const handleDeleteMessage = (messageId: string) => {
+    sendMessage({
+      id: messageId,
+      updateType: 'delete'
+    });
+  };
+
   // Filter messages based on channel type and IDs
   const channelMessages = messages.filter(msg => {
     if (channel.type === 'direct') {
@@ -191,6 +206,8 @@ const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMes
                 isPinned={pinnedMessages.some(m => m.id === message.id)}
                 onOpenThread={() => setOpenThread({message, channel})}
                 onReact={handleReact}
+                onEdit={handleEditMessage}
+                onDelete={handleDeleteMessage}
               />
             </div>
           ))}
