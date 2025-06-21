@@ -67,36 +67,6 @@ const WaterBackground: React.FC = () => {
           </div>
         </div>
       ))}
-      <style jsx global>{`
-        @keyframes bubbleUp {
-          0% {
-            transform: translateY(0) scale(1);
-            opacity: 0.2;
-          }
-          10% {
-            opacity: 0.4;
-          }
-          80% {
-            opacity: 0.4;
-          }
-          100% {
-            transform: translateY(-100vh) scale(1.1);
-            opacity: 0;
-          }
-        }
-        .bubble-anim {
-          animation-name: bubbleUp;
-          animation-timing-function: linear;
-          animation-iteration-count: infinite;
-        }
-        .animate-water-bg {
-          animation: waterGradient 18s ease-in-out infinite alternate;
-        }
-        @keyframes waterGradient {
-          0% { filter: blur(0px) brightness(0.97); }
-          100% { filter: blur(2px) brightness(1.03); }
-        }
-      `}</style>
     </div>
   );
 };
