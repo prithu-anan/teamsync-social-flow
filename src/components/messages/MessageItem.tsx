@@ -11,6 +11,8 @@ import {
 import ReactionPicker from "./ReactionPicker";
 import ImagePreviewModal from "./ImagePreviewModal";
 import type { Message } from "@/pages/Messages";
+import { useAuth } from "@/contexts/AuthContext";
+import { formatRelativeTime } from "@/lib/utils";
 
 interface MessageItemProps {
   message: Message;
@@ -22,6 +24,7 @@ interface MessageItemProps {
 }
 
 const MessageItem = ({ message, onReply, onPin, isPinned, onOpenThread, onReact }: MessageItemProps) => {
+  const { user } = useAuth();
   const [showActions, setShowActions] = useState(false);
   const [showImagePreview, setShowImagePreview] = useState(false);
 
@@ -30,27 +33,29 @@ const MessageItem = ({ message, onReply, onPin, isPinned, onOpenThread, onReact 
   };
 
   const hasReacted = (emoji: string) => {
-    return message.reactions?.some(r => r.emoji === emoji && r.users.includes('user-1')); // Replace 'user-1' with actual user ID
+    return message.reactions?.some(r => r.emoji === emoji && r.users.includes(user?.id || 'user-1'));
   };
 
   return (
     <div 
-      className="group flex gap-3 hover:bg-muted/30 -mx-6 px-6 py-2 rounded-lg transition-colors"
+      className={`group flex gap-3 hover:bg-muted/30 -mx-6 px-6 py-2 rounded-lg transition-colors ${
+        message.isOptimistic ? 'opacity-60' : ''
+      }`}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
       {/* Avatar */}
       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
         <span className="text-sm font-medium">
-          {message.userName.split(' ').map(n => n[0]).join('')}
+          {message.userName?.split(' ').map(n => n[0]).join('') || 'U'}
         </span>
       </div>
 
       {/* Message Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2 mb-1">
-          <span className="font-semibold text-sm">{message.userName}</span>
-          <span className="text-xs text-muted-foreground">{message.timestamp}</span>
+          <span className="font-semibold text-sm">{message.userName || 'Unknown User'}</span>
+          <span className="text-xs text-muted-foreground">{formatRelativeTime(message.timestamp)}</span>
           {message.isUrgent && (
             <Badge variant="destructive" className="text-xs">
               Urgent
@@ -136,7 +141,7 @@ const MessageItem = ({ message, onReply, onPin, isPinned, onOpenThread, onReact 
         )}
 
         {/* Thread replies indicator */}
-        {message.threadId && (
+        {message.thread_parent_id && (
           <Button variant="ghost" size="sm" className="mt-2 text-xs text-blue-600 hover:text-blue-800" onClick={onOpenThread}>
             View thread →
           </Button>

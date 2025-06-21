@@ -1,7 +1,7 @@
 import { Hash, Circle, MoreHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, formatRelativeTime } from "@/lib/utils";
 import type { Channel } from "@/pages/Messages";
 
 interface ChannelSidebarProps {
@@ -23,7 +23,7 @@ const ChannelSidebar = ({ channels, selectedChannel, onChannelSelect }: ChannelS
       onClick={() => onChannelSelect(channel)}
     >
       <div className="flex items-center gap-3 flex-1 min-w-0">
-        {channel.type === 'channel' ? (
+        {channel.type === 'group' ? (
           <Hash className="h-4 w-4 text-muted-foreground flex-shrink-0" />
         ) : (
           <div className="relative flex-shrink-0">
@@ -49,12 +49,15 @@ const ChannelSidebar = ({ channels, selectedChannel, onChannelSelect }: ChannelS
           </div>
           {channel.lastMessage && (
             <p className="text-sm text-muted-foreground truncate">
+              {channel.lastMessageUserName && (
+                <span className="font-medium">{channel.lastMessageUserName}: </span>
+              )}
               {channel.lastMessage}
             </p>
           )}
           {channel.lastMessageTime && (
             <p className="text-xs text-muted-foreground">
-              {channel.lastMessageTime}
+              {formatRelativeTime(channel.lastMessageTime)}
             </p>
           )}
         </div>

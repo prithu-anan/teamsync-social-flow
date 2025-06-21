@@ -161,7 +161,32 @@ const Dashboard = () => {
     const fetchTasks = async () => {
       const data = await getTasks();
       if (!data.error) {
-        const transformedTasks = data.map((task: any) => ({
+        // Handle different response structures
+        let tasksData = data;
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+          // If data is an object, check for common properties
+          if (data.data && Array.isArray(data.data)) {
+            tasksData = data.data;
+          } else if (data.tasks && Array.isArray(data.tasks)) {
+            tasksData = data.tasks;
+          } else if (data.items && Array.isArray(data.items)) {
+            tasksData = data.items;
+          } else {
+            // If we can't find an array, use empty array
+            console.log("Tasks API response structure:", data);
+            setTasks([]);
+            return;
+          }
+        }
+
+        // Ensure we have an array
+        if (!Array.isArray(tasksData)) {
+          console.log("Tasks data is not an array:", tasksData);
+          setTasks([]);
+          return;
+        }
+
+        const transformedTasks = tasksData.map((task: any) => ({
           id: task.id.toString(),
           title: task.title,
           status: task.status === "done" ? "done" : task.status === "in_progress" ? "in-progress" : "todo",
@@ -175,6 +200,7 @@ const Dashboard = () => {
         setTasks(transformedTasks);
       } else {
         console.error(data.error);
+        setTasks([]);
       }
     };
 

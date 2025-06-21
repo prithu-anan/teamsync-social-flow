@@ -9,6 +9,7 @@ import EmojiPicker from "./EmojiPicker";
 import type { Message, Channel } from "@/pages/Messages";
 import ThreadModal from './ThreadModal';
 import PinnedMessagesModal from './PinnedMessagesModal';
+import { useAuth } from "@/contexts/AuthContext";
 
 interface MessageThreadProps {
   messages: Message[];
@@ -22,6 +23,7 @@ interface MessageThreadProps {
 }
 
 const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMessages, onPinMessage, onUnpinMessage, sendMessage }: MessageThreadProps) => {
+  const { user } = useAuth();
   const [newMessage, setNewMessage] = useState("");
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -39,6 +41,10 @@ const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMes
 
   const handleSendMessage = () => {
     if (newMessage.trim()) {
+      console.log("MessageThread: Sending message with content:", newMessage);
+      console.log("MessageThread: Message length:", newMessage.length);
+      console.log("MessageThread: Message type:", typeof newMessage);
+      
       sendMessage({
         content: newMessage,
         replyTo: replyingTo ? replyingTo.id : undefined,
@@ -89,7 +95,7 @@ const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMes
 
     const updatedReactions = [...(message.reactions || [])];
     const existingReaction = updatedReactions.find(r => r.emoji === emoji);
-    const userId = 'user-1'; // Replace with actual user ID
+    const userId = user?.id || 'user-1'; // Use actual user ID
 
     if (existingReaction) {
       if (existingReaction.users.includes(userId)) {
@@ -128,7 +134,17 @@ const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMes
     });
   };
 
-  const channelMessages = messages.filter(msg => msg.channelId === channel.id);
+  // Filter messages based on channel type and IDs
+  const channelMessages = messages.filter(msg => {
+    if (channel.type === 'direct') {
+      // For direct messages, check if the message is between the current user and the recipient
+      return (msg.recipient_id === channel.recipient_id && msg.sender_id === user?.id) ||
+             (msg.recipient_id === user?.id && msg.sender_id === channel.recipient_id);
+    } else {
+      // For group messages, check if the message belongs to this channel
+      return msg.channel_id === channel.channel_id;
+    }
+  });
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -198,59 +214,48 @@ const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMes
           </div>
         )}
         <div className="flex items-end gap-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Button variant="ghost" size="icon" className="relative">
-              <Image className="h-4 w-4" />
-              <input 
-                type="file" 
-                accept="image/*" 
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-                onChange={handleFileChange} 
-              />
-            </Button>
-            <Button variant="ghost" size="icon" className="relative">
-              <Plus className="h-4 w-4" />
-              <input 
-                type="file" 
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-                onChange={handleFileChange} 
-              />
-            </Button>
-          </div>
           <div className="flex-1">
             <Textarea
-              placeholder={`Message ${channel.type === 'channel' ? '#' + channel.name : channel.name}...`}
               value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
+              onChange={(e) => {
+                console.log("Textarea onChange - new value:", e.target.value);
+                console.log("Textarea onChange - value length:", e.target.value.length);
+                setNewMessage(e.target.value);
+              }}
               onKeyPress={handleKeyPress}
-              className="min-h-[60px] max-h-32 resize-none"
+              placeholder="Type a message..."
+              className="min-h-[60px] max-h-[120px] resize-none"
+              rows={1}
             />
           </div>
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              id="file-upload"
+              className="hidden"
+              onChange={handleFileChange}
+              accept="image/*,.pdf,.doc,.docx,.txt"
+            />
+            <label htmlFor="file-upload">
+              <Button variant="ghost" size="icon" className="h-10 w-10" asChild>
+                <span>
+                  <Plus className="h-4 w-4" />
+                </span>
+              </Button>
+            </label>
             <EmojiPicker onEmojiSelect={handleEmojiSelect}>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="h-10 w-10">
                 <Smile className="h-4 w-4" />
               </Button>
             </EmojiPicker>
             <Button 
               onClick={handleSendMessage}
               disabled={!newMessage.trim()}
-              size="icon"
+              className="h-10 w-10 p-0"
             >
               <Send className="h-4 w-4" />
             </Button>
           </div>
-        </div>
-        <div className="mt-2 text-xs text-muted-foreground flex items-center justify-between">
-          <p>
-            <strong>Enter</strong> to send, <strong>Shift + Enter</strong> for new line
-          </p>
-          {channel.type === 'channel' && (
-            <p className="flex items-center gap-1">
-              <Bell className="h-3 w-3" />
-              Notify channel
-            </p>
-          )}
         </div>
       </div>
       {/* Thread view modal or side panel */}

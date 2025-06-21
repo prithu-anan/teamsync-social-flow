@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Search, Hash, Users, Plus, Settings } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,29 +9,39 @@ import MessageThread from "@/components/messages/MessageThread";
 import { Badge } from "@/components/ui/badge";
 import ThreadModal from "@/components/messages/ThreadModal";
 import WaterBackground from '@/components/WaterBackground';
+import { useAuth } from "@/contexts/AuthContext";
+import { 
+  getChannels, 
+  getMessages, 
+  sendMessage,
+  getUsers
+} from "@/util/api-helpers";
+import { toast } from "@/components/ui/use-toast";
 
 export interface Channel {
   id: string;
   name: string;
-  type: 'dm' | 'channel';
+  type: 'direct' | 'group';
   isOnline?: boolean;
   unreadCount?: number;
   lastMessage?: string;
   lastMessageTime?: string;
   participants?: string[];
   project?: string;
+  recipient_id?: string | null;
+  channel_id?: string | null;
 }
 
 export interface Message {
   id: string;
-  userId: string;
-  userName: string;
-  userAvatar: string;
+  sender_id: string;
+  channel_id?: string | null;
+  recipient_id?: string | null;
   content: string;
   timestamp: string;
-  channelId: string;
-  threadId?: string;
-  replyTo?: string;
+  thread_parent_id?: string | null;
+  userName?: string;
+  userAvatar?: string;
   reactions?: { emoji: string; count: number; users: string[] }[];
   isUrgent?: boolean;
   responseRequired?: boolean;
@@ -40,93 +50,276 @@ export interface Message {
   fileName?: string;
   imageUrl?: string;
   updateType?: 'reaction' | 'new' | 'edit' | 'delete';
+  isOptimistic?: boolean;
 }
 
-// Mock data
-const channels: Channel[] = [
-  { id: 'dm-1', name: 'Mia Alvarez', type: 'dm', isOnline: true, unreadCount: 1, lastMessage: "Morning! 👋 I just got feedback from marketing...", lastMessageTime: "42 mins ago" },
-  { id: 'dm-2', name: 'Lena Olsson', type: 'dm', isOnline: false, unreadCount: 1, lastMessage: "Thanks @Lena Olsson! Sure thing, it's called...", lastMessageTime: "4:43pm" },
-  { id: 'dm-3', name: 'Hardeep Kaur', type: 'dm', isOnline: true, unreadCount: 1, lastMessage: "Hola Lena 👋 here's the file you asked for", lastMessageTime: "4:46pm" },
-  { id: 'dm-4', name: 'Alex Chen', type: 'dm', isOnline: false, unreadCount: 0, lastMessage: "See you at the meeting!", lastMessageTime: "2:10pm" },
-  { id: 'dm-5', name: 'Priya Singh', type: 'dm', isOnline: true, unreadCount: 2, lastMessage: "Can you review my PR?", lastMessageTime: "1:55pm" },
-  { id: 'dm-6', name: 'Tomás Silva', type: 'dm', isOnline: false, unreadCount: 0, lastMessage: "Lunch?", lastMessageTime: "12:30pm" },
-  { id: 'dm-7', name: 'Sara Müller', type: 'dm', isOnline: true, unreadCount: 0, lastMessage: "Sent the docs!", lastMessageTime: "11:20am" },
-  { id: 'dm-8', name: 'Yuki Tanaka', type: 'dm', isOnline: false, unreadCount: 0, lastMessage: "Arigato!", lastMessageTime: "10:10am" },
-  { id: 'dm-9', name: 'Omar Farouk', type: 'dm', isOnline: true, unreadCount: 1, lastMessage: "Check this out!", lastMessageTime: "9:00am" },
-  { id: 'dm-10', name: 'Emily Johnson', type: 'dm', isOnline: false, unreadCount: 0, lastMessage: "Good night!", lastMessageTime: "yesterday" },
-  { id: 'channel-1', name: 'design-hive', type: 'channel', project: 'Design System', unreadCount: 5, lastMessage: "Can we discuss the new color palette?", lastMessageTime: "10 mins ago" },
-  { id: 'channel-2', name: 'product-updates', type: 'channel', project: 'Product', unreadCount: 2, lastMessage: "New feature deployed successfully", lastMessageTime: "1 hour ago" },
-  { id: 'channel-3', name: 'pets-images', type: 'channel', project: 'Fun', lastMessage: "Check out this cute puppy!", lastMessageTime: "yesterday" },
-  { id: 'channel-4', name: 'frontend-devs', type: 'channel', project: 'Web', unreadCount: 3, lastMessage: "React 18 is out!", lastMessageTime: "5 mins ago" },
-  { id: 'channel-5', name: 'backend-team', type: 'channel', project: 'API', unreadCount: 0, lastMessage: "DB migration scheduled", lastMessageTime: "yesterday" },
-  { id: 'channel-6', name: 'random', type: 'channel', project: 'Fun', unreadCount: 1, lastMessage: "Friday memes!", lastMessageTime: "today" },
-  { id: 'channel-7', name: 'marketing', type: 'channel', project: 'Growth', unreadCount: 0, lastMessage: "Campaign results are in", lastMessageTime: "yesterday" },
-  { id: 'channel-8', name: 'support', type: 'channel', project: 'Customer', unreadCount: 2, lastMessage: "Ticket #1234 resolved", lastMessageTime: "2 hours ago" },
-  { id: 'channel-9', name: 'qa', type: 'channel', project: 'Testing', unreadCount: 0, lastMessage: "All tests passed", lastMessageTime: "yesterday" },
-  { id: 'channel-10', name: 'announcements', type: 'channel', project: 'General', unreadCount: 0, lastMessage: "Welcome to the team!", lastMessageTime: "2 days ago" },
-  { id: 'channel-11', name: 'devops', type: 'channel', project: 'Infra', unreadCount: 1, lastMessage: "CI/CD updated", lastMessageTime: "3 hours ago" },
-  { id: 'channel-12', name: 'memes', type: 'channel', project: 'Fun', unreadCount: 0, lastMessage: "Best meme of 2024", lastMessageTime: "today" },
-  { id: 'channel-13', name: 'book-club', type: 'channel', project: 'Culture', unreadCount: 0, lastMessage: "Next book: Dune", lastMessageTime: "yesterday" },
-  { id: 'channel-14', name: 'music', type: 'channel', project: 'Fun', unreadCount: 0, lastMessage: "Share your playlist!", lastMessageTime: "today" },
-  { id: 'channel-15', name: 'ai-lab', type: 'channel', project: 'Research', unreadCount: 0, lastMessage: "GPT-4o is amazing!", lastMessageTime: "just now" },
-];
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+}
 
 const Messages = () => {
+  const { user } = useAuth();
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("dms");
   const [openThread, setOpenThread] = useState<{message: Message, channel: Channel} | null>(null);
   const [pinnedMessages, setPinnedMessages] = useState<{[channelId: string]: Message[]}>({});
-  const [allMessages, setAllMessages] = useState<Message[]>(() => {
-    // Generate 30+ messages with various types for testing
-    const baseMsgs = [
-      {
-        id: 'msg-1', userId: 'user-1', userName: 'Mia Alvarez', userAvatar: '/placeholder.svg', content: "Morning! 👋 I just got feedback from marketing. They'd like to see some pop of color in the call-to-action buttons. @Lena Olsson , would you like to take this up?", timestamp: "42 mins ago", channelId: 'channel-1', reactions: [{emoji: '👍', count: 2, users: ['user-2','user-3']}],
-      },
-      {
-        id: 'msg-2', userId: 'user-2', userName: 'Gabriella Kim', userAvatar: '/placeholder.svg', content: "Team! Reminder about our brainstorm at 3 PM. Looking forward to some fresh ideas!", timestamp: "32 mins ago", channelId: 'channel-1', reactions: [{emoji: '❤️', count: 1, users: ['user-1']}],
-      },
-      {
-        id: 'msg-3', userId: 'user-3', userName: 'Isaac Goldberg', userAvatar: '/placeholder.svg', content: "Quick question: Who was behind the tablet designs? Need to discuss a small tweak.", timestamp: "10 mins ago", channelId: 'channel-1',
-      },
-      {
-        id: 'msg-4', userId: 'user-4', userName: 'Dann Cox', userAvatar: '/placeholder.svg', content: 'Does anyone know how to recover the "Foundations" project in Figma? 😱', timestamp: "now", channelId: 'channel-1', isUrgent: true, responseRequired: true, responseTime: "2 hours, 13 mins"
-      },
-      {
-        id: 'msg-5', userId: 'user-2', userName: 'Gabriella Kim', userAvatar: '/placeholder.svg', content: "Here's the logo!", timestamp: "just now", channelId: 'channel-1', fileUrl: '/test.pdf', fileName: 'test.pdf', reactions: [{emoji: '🔥', count: 1, users: ['user-1']}],
-      },
-      {
-        id: 'msg-6', userId: 'user-3', userName: 'Isaac Goldberg', userAvatar: '/placeholder.svg', content: "Check out this image!", timestamp: "just now", channelId: 'channel-1', imageUrl: '/test-image.jpg', reactions: [{emoji: '😂', count: 1, users: ['user-2']}],
-      },
-      // Add more messages for other channels and DMs
-    ];
-    // Add 30+ more messages for scroll testing
-    let msgs: Message[] = [...baseMsgs];
-    for (let i = 7; i < 40; i++) {
-      msgs.push({
-        id: `msg-${i}`,
-        userId: `user-${(i%4)+1}`,
-        userName: ['Mia Alvarez','Gabriella Kim','Isaac Goldberg','Dann Cox'][(i%4)],
-        userAvatar: '/placeholder.svg',
-        content: `Test message ${i}`,
-        timestamp: `${i} mins ago`,
-        channelId: i%2===0 ? 'channel-1' : 'channel-2',
-        reactions: i%5===0 ? [{emoji: '👍', count: i%3+1, users: ['user-1','user-2']}] : [],
-        threadId: i%7===0 ? `thread-${i}` : undefined,
-      });
-    }
-    return msgs;
-  });
+  
+  // API state
+  const [allChannels, setAllChannels] = useState<Channel[]>([]);
+  const [allMessages, setAllMessages] = useState<Message[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [unreadCounts, setUnreadCounts] = useState<{[id: string]: number}>({});
 
-  const [unreadCounts, setUnreadCounts] = useState<{[id: string]: number}>(() => {
-    const counts: {[id: string]: number} = {};
-    channels.forEach(c => { counts[c.id] = c.unreadCount || 0; });
-    return counts;
+  // Fetch all channels and filter by type
+  const fetchChannels = async () => {
+    setLoading(true);
+    try {
+      const response = await getChannels();
+      
+      if (response.error) {
+        toast({
+          title: "Error",
+          description: response.error,
+          variant: "destructive",
+        });
+        // Use fallback demo data
+        setAllChannels(getFallbackChannels());
+        return;
+      }
+
+      // Handle different response structures
+      let channelsData = response;
+      if (response && typeof response === 'object' && !Array.isArray(response)) {
+        // If response is an object, check for common properties
+        if (response.data && Array.isArray(response.data)) {
+          channelsData = response.data;
+        } else if (response.channels && Array.isArray(response.channels)) {
+          channelsData = response.channels;
+        } else if (response.items && Array.isArray(response.items)) {
+          channelsData = response.items;
+        } else {
+          // If we can't find an array, use fallback data
+          console.log("API response structure:", response);
+          setAllChannels(getFallbackChannels());
+          return;
+        }
+      }
+
+      // Ensure we have an array
+      if (!Array.isArray(channelsData)) {
+        console.log("Channels data is not an array:", channelsData);
+        setAllChannels(getFallbackChannels());
+        return;
+      }
+
+      // Transform API response to match our interface
+      const transformedChannels = channelsData.map((channel: any) => ({
+        id: channel.id?.toString() || `channel-${Date.now()}`,
+        name: channel.name || 'Unnamed Channel',
+        type: channel.type || 'group', // 'direct' or 'group'
+        recipient_id: channel.recipient_id?.toString() || null,
+        channel_id: channel.channel_id?.toString() || channel.id?.toString() || null,
+        project: channel.project?.name || channel.project || null,
+        unreadCount: 0, // Will be calculated from messages
+        lastMessage: "",
+        lastMessageTime: "",
+        participants: channel.members?.map((m: any) => m.id?.toString() || m.toString()) || [],
+      }));
+
+      // If no channels returned, use fallback data
+      if (transformedChannels.length === 0) {
+        setAllChannels(getFallbackChannels());
+      } else {
+        setAllChannels(transformedChannels);
+      }
+    } catch (error) {
+      console.error("Error fetching channels:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch channels",
+        variant: "destructive",
+      });
+      // Use fallback demo data
+      setAllChannels(getFallbackChannels());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch users for direct messages
+  const fetchUsers = async () => {
+    try {
+      const response = await getUsers();
+      
+      if (response.error) {
+        console.error("Failed to fetch users:", response.error);
+        return;
+      }
+
+      // Handle different response structures
+      let usersData = response;
+      if (response && typeof response === 'object' && !Array.isArray(response)) {
+        // If response is an object, check for common properties
+        if (response.data && Array.isArray(response.data)) {
+          usersData = response.data;
+        } else if (response.users && Array.isArray(response.users)) {
+          usersData = response.users;
+        } else if (response.items && Array.isArray(response.items)) {
+          usersData = response.items;
+        } else {
+          // If we can't find an array, use empty array
+          console.log("Users API response structure:", response);
+          setUsers([]);
+          return;
+        }
+      }
+
+      // Ensure we have an array
+      if (!Array.isArray(usersData)) {
+        console.log("Users data is not an array:", usersData);
+        setUsers([]);
+        return;
+      }
+
+      setUsers(usersData);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      setUsers([]);
+    }
+  };
+
+  // Fetch messages for a channel
+  const fetchMessages = async (channel: Channel) => {
+    setMessagesLoading(true);
+    try {
+      let response;
+      
+      if (channel.type === 'direct') {
+        // For direct messages, we need to handle this differently
+        // Since the API doesn't have a direct endpoint for DMs, we'll use fallback data
+        setAllMessages(getFallbackDirectMessages(channel));
+        setMessagesLoading(false);
+        return;
+      } else if (channel.channel_id) {
+        // For group messages, use the existing API
+        response = await getMessages(channel.channel_id);
+      } else {
+        console.error("Invalid channel configuration");
+        setMessagesLoading(false);
+        return;
+      }
+
+      if (response.error) {
+        toast({
+          title: "Error",
+          description: response.error,
+          variant: "destructive",
+        });
+        // Use fallback demo messages
+        setAllMessages(getFallbackMessages(channel));
+        setMessagesLoading(false);
+        return;
+      }
+
+      // Handle different response structures
+      let messagesData = response;
+      if (response && typeof response === 'object' && !Array.isArray(response)) {
+        // If response is an object, check for common properties
+        if (response.data && Array.isArray(response.data)) {
+          messagesData = response.data;
+        } else if (response.messages && Array.isArray(response.messages)) {
+          messagesData = response.messages;
+        } else if (response.items && Array.isArray(response.items)) {
+          messagesData = response.items;
+        } else {
+          // If we can't find an array, use fallback data
+          console.log("Messages API response structure:", response);
+          setAllMessages(getFallbackMessages(channel));
+          setMessagesLoading(false);
+          return;
+        }
+      }
+
+      // Ensure we have an array
+      if (!Array.isArray(messagesData)) {
+        console.log("Messages data is not an array:", messagesData);
+        setAllMessages(getFallbackMessages(channel));
+        setMessagesLoading(false);
+        return;
+      }
+
+      // Transform API response to match our interface
+      const transformedMessages = messagesData.map((msg: any) => ({
+        id: msg.id?.toString() || `msg-${Date.now()}`,
+        sender_id: msg.sender_id?.toString() || msg.sender_id || 'unknown',
+        channel_id: msg.channel_id?.toString() || channel.channel_id,
+        recipient_id: msg.recipient_id?.toString() || null,
+        content: msg.content || '',
+        timestamp: msg.timestamp || new Date().toISOString(),
+        thread_parent_id: msg.thread_parent_id?.toString() || null,
+        userName: users.find(u => u.id?.toString() === msg.sender_id?.toString())?.name || 
+                users.find(u => u.id?.toString() === msg.sender_id)?.name || 
+                'Unknown User',
+        userAvatar: users.find(u => u.id?.toString() === msg.sender_id?.toString())?.avatar || 
+                   users.find(u => u.id?.toString() === msg.sender_id)?.avatar || 
+                   '/placeholder.svg',
+        reactions: [], // API doesn't provide reactions yet
+      }));
+
+      // If no messages returned, use fallback data
+      if (transformedMessages.length === 0) {
+        setAllMessages(getFallbackMessages(channel));
+      } else {
+        setAllMessages(transformedMessages);
+      }
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch messages",
+        variant: "destructive",
+      });
+      // Use fallback demo messages
+      setAllMessages(getFallbackMessages(channel));
+    } finally {
+      setMessagesLoading(false);
+    }
+  };
+
+  // Load initial data
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  useEffect(() => {
+    fetchChannels();
+  }, []);
+
+  // Filter channels based on active tab and search query
+  const filteredChannels = allChannels.filter(channel => {
+    const matchesSearch = channel.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesTab = activeTab === 'dms' ? channel.type === 'direct' : channel.type === 'group';
+    return matchesSearch && matchesTab;
   });
 
   // Compute sidebar channels with live preview and unread
-  const sidebarChannels = channels.map(channel => {
-    const channelMsgs = allMessages.filter(m => m.channelId === channel.id);
+  const sidebarChannels = filteredChannels.map(channel => {
+    const channelMsgs = allMessages.filter(m => {
+      if (channel.type === 'direct') {
+        // For direct messages, check if the message is between the current user and the recipient
+        return (m.recipient_id === channel.recipient_id && m.sender_id === user?.id) ||
+               (m.recipient_id === user?.id && m.sender_id === channel.recipient_id);
+      } else {
+        // For group messages, check if the message belongs to this channel
+        return m.channel_id === channel.channel_id;
+      }
+    });
     const lastMsg = channelMsgs[channelMsgs.length - 1];
     return {
       ...channel,
@@ -137,36 +330,227 @@ const Messages = () => {
     };
   });
 
-  const filteredChannels = sidebarChannels.filter(channel => {
-    const matchesSearch = channel.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesTab = activeTab === 'dms' ? channel.type === 'dm' : channel.type === 'channel';
-    return matchesSearch && matchesTab;
-  });
-
-  // When a channel is selected, set its unreadCount to 0
-  const handleChannelSelect = (channel: Channel) => {
+  // When a channel is selected, set its unreadCount to 0 and fetch messages
+  const handleChannelSelect = async (channel: Channel) => {
     setSelectedChannel(channel);
     setUnreadCounts(counts => ({ ...counts, [channel.id]: 0 }));
+    await fetchMessages(channel);
   };
 
-  const sendMessage = (msg: Partial<Message>) => {
+  const sendMessageHandler = async (msg: Partial<Message>) => {
+    if (!selectedChannel) return;
+
+    // Debug logging
+    console.log("sendMessageHandler called with:", msg);
+
     if (msg.updateType === 'reaction' && msg.id) {
       setAllMessages((prev) => prev.map(m => m.id === msg.id ? { ...m, reactions: msg.reactions } : m));
     } else {
-      setAllMessages((prev) => [
-        ...prev,
-        {
-          ...msg,
-          id: `msg-${Date.now()}`,
-          userId: 'user-1',
-          userName: 'Mia Alvarez',
-          userAvatar: '/placeholder.svg',
-          timestamp: 'now',
-          channelId: selectedChannel?.id || 'channel-1',
-          content: msg.content ?? '',
+      try {
+        let response;
+        
+        if (selectedChannel.type === 'direct') {
+          // For direct messages, we'll add to local state since API doesn't support DMs yet
+          const newMessage: Message = {
+            id: `msg-${Date.now()}`,
+            sender_id: user?.id || '',
+            channel_id: null,
+            recipient_id: selectedChannel.recipient_id || null,
+            content: msg.content || '',
+            timestamp: new Date().toISOString(),
+            userName: user?.name || 'You',
+            userAvatar: user?.avatar || '/placeholder.svg',
+          };
+          setAllMessages(prev => [...prev, newMessage]);
+          return;
+        } else if (selectedChannel.channel_id) {
+          // For group messages, use the existing API
+          console.log("Selected channel:", selectedChannel);
+          console.log("Channel ID being used:", selectedChannel.channel_id);
+          console.log("Message content being sent:", msg.content);
+          
+          // Ensure we have valid content
+          if (!msg.content || msg.content.trim() === '') {
+            console.error("Empty message content");
+            return;
+          }
+          
+          response = await sendMessage(selectedChannel.channel_id, { 
+            content: msg.content.trim(),
+            recipient_id: selectedChannel.recipient_id || null,
+            thread_parent_id: msg.replyTo || null
+          });
+        } else {
+          console.error("Invalid channel configuration for sending message");
+          return;
         }
-      ]);
+
+        if (!response) {
+          toast({
+            title: "Error",
+            description: "No response from server.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Debug: Log the exact response structure
+        console.log("Full API response:", response);
+        console.log("Response type:", typeof response);
+        console.log("Response keys:", Object.keys(response));
+        console.log("Response.code:", response.code);
+        console.log("Response.status:", response.status);
+        
+        // Check if it's a success response (201 status)
+        if (response.code === 201 || response.status === "CREATED") {
+          // Success! The message was created
+          console.log("Message sent successfully:", response);
+          
+          // Add the new message to the list optimistically
+          const newMessage: Message = {
+            id: `msg-${Date.now()}`, // Temporary ID until we get the real one
+            sender_id: user?.id || '',
+            channel_id: selectedChannel.channel_id || null,
+            recipient_id: selectedChannel.recipient_id || null,
+            content: msg.content || '',
+            timestamp: new Date().toISOString(),
+            userName: user?.name || 'You',
+            userAvatar: user?.avatar || '/placeholder.svg',
+            isOptimistic: true, // Mark as optimistic for styling
+          };
+
+          setAllMessages(prev => [...prev, newMessage]);
+          
+          // Remove the optimistic flag after a short delay to show the message is confirmed
+          setTimeout(() => {
+            setAllMessages(prev => 
+              prev.map(m => 
+                m.id === newMessage.id 
+                  ? { ...m, isOptimistic: false }
+                  : m
+              )
+            );
+          }, 1000); // Remove optimistic flag after 1 second
+          
+          return;
+        }
+        
+        if (response.error) {
+          toast({
+            title: "Error",
+            description: response.error,
+            variant: "destructive",
+          });
+          return;
+        }
+      } catch (error) {
+        console.error("Error in sendMessageHandler:", error);
+        toast({
+          title: "Error",
+          description: "Failed to send message",
+          variant: "destructive",
+        });
+      }
     }
+  };
+
+  // Fallback demo data for when API is not available
+  const getFallbackChannels = (): Channel[] => {
+    return [
+      // Direct messages
+      { id: 'dm-1', name: 'John Doe', type: 'direct', recipient_id: '1', channel_id: null, isOnline: true, unreadCount: 1, lastMessage: "Hey, how's it going?", lastMessageTime: "2 mins ago" },
+      { id: 'dm-2', name: 'Jane Smith', type: 'direct', recipient_id: '2', channel_id: null, isOnline: false, unreadCount: 0, lastMessage: "Thanks for the help!", lastMessageTime: "1 hour ago" },
+      { id: 'dm-3', name: 'Mike Johnson', type: 'direct', recipient_id: '3', channel_id: null, isOnline: true, unreadCount: 2, lastMessage: "Can you review this?", lastMessageTime: "3 hours ago" },
+      // Group channels
+      { id: 'channel-1', name: 'general', type: 'group', recipient_id: null, channel_id: '1', project: 'Team', unreadCount: 5, lastMessage: "Welcome everyone!", lastMessageTime: "10 mins ago" },
+      { id: 'channel-2', name: 'random', type: 'group', recipient_id: null, channel_id: '2', project: 'Fun', unreadCount: 0, lastMessage: "Check out this meme!", lastMessageTime: "1 hour ago" },
+      { id: 'channel-3', name: 'announcements', type: 'group', recipient_id: null, channel_id: '3', project: 'Updates', unreadCount: 1, lastMessage: "New feature released", lastMessageTime: "2 hours ago" },
+    ];
+  };
+
+  // Fallback demo messages for when API is not available
+  const getFallbackMessages = (channel: Channel): Message[] => {
+    const baseMessages = [
+      {
+        id: 'msg-1',
+        sender_id: '1',
+        channel_id: channel.type === 'group' ? channel.channel_id : null,
+        recipient_id: channel.type === 'direct' ? user?.id || '1' : null,
+        content: "Hello everyone! 👋",
+        timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 minutes ago
+        thread_parent_id: null,
+        userName: 'John Doe',
+        userAvatar: '/placeholder.svg',
+        reactions: [],
+      },
+      {
+        id: 'msg-2',
+        sender_id: user?.id || '2',
+        channel_id: channel.type === 'group' ? channel.channel_id : null,
+        recipient_id: channel.type === 'direct' ? channel.recipient_id : null,
+        content: "Hi there! 👋",
+        timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(), // 15 minutes ago
+        thread_parent_id: null,
+        userName: user?.name || 'You',
+        userAvatar: user?.avatar || '/placeholder.svg',
+        reactions: [],
+      },
+    ];
+
+    if (channel.type === 'group') {
+      baseMessages.push({
+        id: 'msg-3',
+        sender_id: '3',
+        channel_id: channel.channel_id,
+        recipient_id: null,
+        content: "This is a demo message to show how the chat works!",
+        timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(), // 5 minutes ago
+        thread_parent_id: null,
+        userName: 'Jane Smith',
+        userAvatar: '/placeholder.svg',
+        reactions: [],
+      });
+    }
+
+    return baseMessages;
+  };
+
+  // Fallback demo direct messages
+  const getFallbackDirectMessages = (channel: Channel): Message[] => {
+    return [
+      {
+        id: 'msg-1',
+        sender_id: channel.recipient_id || '1',
+        channel_id: null,
+        recipient_id: user?.id || '1',
+        content: `Hey! How are you doing?`,
+        timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+        thread_parent_id: null,
+        userName: channel.name,
+        userAvatar: '/placeholder.svg',
+        reactions: [],
+      },
+      {
+        id: 'msg-2',
+        sender_id: user?.id || '2',
+        channel_id: null,
+        recipient_id: channel.recipient_id || '1',
+        content: "I'm doing great, thanks for asking!",
+        timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
+        thread_parent_id: null,
+        userName: user?.name || 'You',
+        userAvatar: user?.avatar || '/placeholder.svg',
+        reactions: [],
+      },
+    ];
+  };
+
+  // Handle starting a new conversation
+  const handleStartNewConversation = () => {
+    toast({
+      title: "New Conversation",
+      description: "Select a user to start a direct message",
+    });
   };
 
   return (
@@ -179,7 +563,7 @@ const Messages = () => {
           <div className="p-4 border-b border-border bg-background/50 flex-shrink-0">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Messages</h2>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" onClick={handleStartNewConversation}>
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
@@ -204,12 +588,18 @@ const Messages = () => {
           
           {/* Scrollable conversation list */}
           <ScrollArea className="flex-1 min-h-0 conversation-scroll-area">
-            <ChannelSidebar 
-              channels={filteredChannels} 
-              selectedChannel={selectedChannel}
-              onChannelSelect={handleChannelSelect}
-              searchQuery={searchQuery}
-            />
+            {loading ? (
+              <div className="p-4 text-center text-muted-foreground">
+                Loading conversations...
+              </div>
+            ) : (
+              <ChannelSidebar 
+                channels={sidebarChannels} 
+                selectedChannel={selectedChannel}
+                onChannelSelect={handleChannelSelect}
+                searchQuery={searchQuery}
+              />
+            )}
           </ScrollArea>
         </div>
 
@@ -220,7 +610,7 @@ const Messages = () => {
               {/* Channel Header - Fixed */}
               <div className="h-16 border-b border-border bg-background/80 flex items-center justify-between px-6 flex-shrink-0">
                 <div className="flex items-center gap-3">
-                  {selectedChannel.type === 'channel' ? (
+                  {selectedChannel.type === 'group' ? (
                     <Hash className="h-5 w-5 text-muted-foreground" />
                   ) : (
                     <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -231,7 +621,7 @@ const Messages = () => {
                   )}
                   <div>
                     <h3 className="font-semibold">{selectedChannel.name}</h3>
-                    {selectedChannel.type === 'channel' && selectedChannel.project && (
+                    {selectedChannel.type === 'group' && selectedChannel.project && (
                       <p className="text-sm text-muted-foreground">{selectedChannel.project} Project</p>
                     )}
                   </div>
@@ -248,23 +638,38 @@ const Messages = () => {
 
               {/* Messages - Scrollable content */}
               <div className="flex-1 min-h-0 flex flex-col">
-                <MessageThread 
-                  messages={allMessages.filter(m => m.channelId === selectedChannel.id)} 
-                  channel={selectedChannel} 
-                  openThread={openThread}
-                  setOpenThread={setOpenThread}
-                  pinnedMessages={pinnedMessages[selectedChannel.id] || []}
-                  onPinMessage={(msg) => setPinnedMessages(p => ({...p, [selectedChannel.id]: [...(p[selectedChannel.id]||[]), msg]}))}
-                  onUnpinMessage={(msg) => setPinnedMessages(p => ({...p, [selectedChannel.id]: (p[selectedChannel.id]||[]).filter(m => m.id !== msg.id)}))}
-                  sendMessage={sendMessage}
-                />
+                {messagesLoading ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <div className="text-center text-muted-foreground">
+                      Loading messages...
+                    </div>
+                  </div>
+                ) : (
+                  <MessageThread 
+                    messages={allMessages.filter(m => {
+                      if (selectedChannel.type === 'direct') {
+                        return (m.recipient_id === selectedChannel.recipient_id && m.sender_id === user?.id) ||
+                               (m.recipient_id === user?.id && m.sender_id === selectedChannel.recipient_id);
+                      } else {
+                        return m.channel_id === selectedChannel.channel_id;
+                      }
+                    })} 
+                    channel={selectedChannel} 
+                    openThread={openThread}
+                    setOpenThread={setOpenThread}
+                    pinnedMessages={pinnedMessages[selectedChannel.id] || []}
+                    onPinMessage={(msg) => setPinnedMessages(p => ({...p, [selectedChannel.id]: [...(p[selectedChannel.id]||[]), msg]}))}
+                    onUnpinMessage={(msg) => setPinnedMessages(p => ({...p, [selectedChannel.id]: (p[selectedChannel.id]||[]).filter(m => m.id !== msg.id)}))}
+                    sendMessage={sendMessageHandler}
+                  />
+                )}
                 {/* Thread Modal */}
                 {openThread && (
                   <ThreadModal 
                     threadMessage={openThread.message}
                     channel={openThread.channel}
                     allMessages={allMessages}
-                    sendMessage={sendMessage}
+                    sendMessage={sendMessageHandler}
                     onClose={() => setOpenThread(null)}
                   />
                 )}
