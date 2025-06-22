@@ -51,7 +51,7 @@ const Login = () => {
         
         <Card className="w-full">
           <CardHeader>
-            <CardTitle>Sign In</CardTitle>
+            <CardTitle>Sign In Now</CardTitle>
             <CardDescription>Enter your credentials below to access your account</CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit}>
