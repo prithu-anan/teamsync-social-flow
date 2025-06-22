@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// const API_BASE_URL = 'http://135.235.169.115:8080';
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = 'http://135.235.169.115:8080';
+// const API_BASE_URL = 'http://localhost:8080';
 
 export const signup = async (req) => {
     try {
