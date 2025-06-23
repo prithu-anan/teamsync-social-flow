@@ -59,7 +59,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     // ✅ Store token
-    localStorage.setItem("teamsync_jwt", res.jwt);
+    localStorage.setItem("teamsync_jwt", res.data.token);
 
     // ✅ Fetch full user profile
     const me = await getMe();
