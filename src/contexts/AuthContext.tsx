@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import { toast } from "@/components/ui/use-toast";
 import { getMe, login as loginApi, signup as signupApi } from "@/util/api-helpers";
@@ -72,12 +71,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return false;
     }
 
-    setUser(me);
-    localStorage.setItem("teamsync_user", JSON.stringify(me));
+    setUser(me.data);
+    localStorage.setItem("teamsync_user", JSON.stringify(me.data));
 
     toast({
       title: "Login successful",
-      description: `Welcome back, ${me.name}!`,
+      description: `Welcome back, ${me.data.name}!`,
     });
 
     return true;
@@ -100,7 +99,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const newUser = {
-      id: res.id,
+      id: res.data.id,
       name,
       email,
       avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff`,

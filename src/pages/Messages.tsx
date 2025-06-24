@@ -347,27 +347,24 @@ const Messages = () => {
         return;
       }
       
-      // Construct a clean object with only the fields the backend expects for an update.
+      // Update payload to match new API: only channel_id, recipient_id, content
       const updatePayload = {
-        sender_id: parseInt(messageToEdit.sender_id, 10),
-        channel_id: selectedChannel?.id ? parseInt(selectedChannel.id, 10) : null,
+        channel_id: selectedChannel?.channel_id ? parseInt(selectedChannel.channel_id, 10) : null,
         recipient_id: messageToEdit.recipient_id ? parseInt(messageToEdit.recipient_id, 10) : null,
         content: msg.content,
-        timestamp: messageToEdit.timestamp, // Keep the original timestamp
-        thread_parent_id: messageToEdit.thread_parent_id ? parseInt(messageToEdit.thread_parent_id, 10) : null
       };
 
       try {
         const response = await editMessage(selectedChannel.channel_id, msg.id, updatePayload);
-        if (response && !response.error) {
+        if (response && response.code === 200 && response.status === "OK") {
           // Optimistically update the UI with the new content
           const updatedMessageInState = { ...messageToEdit, content: msg.content };
           setAllMessages(prev => prev.map(m => 
             m.id === msg.id ? updatedMessageInState : m
           ));
-          toast({ title: "Message updated" });
+          toast({ title: "Success", description: response.message || "Message updated successfully" });
         } else {
-          toast({ title: "Error", description: response?.error || "Failed to update message", variant: "destructive" });
+          toast({ title: "Error", description: response?.message || response?.error || "Failed to update message", variant: "destructive" });
         }
       } catch (error) {
         toast({ title: "Error", description: "An error occurred while editing.", variant: "destructive" });
