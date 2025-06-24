@@ -55,6 +55,8 @@ const MessageItem = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(message.content);
 
+  const isOwnMessage = user?.id && message.sender_id && String(user.id) === String(message.sender_id);
+
   const handleReaction = (emoji: string) => {
     onReact?.(message.id, emoji);
   };
@@ -80,20 +82,82 @@ const MessageItem = ({
       <div 
         className={`group flex gap-3 hover:bg-muted/30 -mx-6 px-6 py-2 rounded-lg transition-colors ${
           message.isOptimistic ? 'opacity-60' : ''
-        }`}
+        } ${isOwnMessage ? 'justify-end text-right' : ''}`}
         onMouseEnter={() => setShowActions(true)}
         onMouseLeave={() => !isMenuOpen && setShowActions(false)}
       >
+        {/* For right-aligned (own) messages, show actions on the left */}
+        {isOwnMessage && (
+          <div className={`flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end`}>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8"
+              onClick={onPin}
+            >
+              <Pin className={`h-4 w-4 ${isPinned ? 'text-yellow-500 fill-yellow-500' : ''}`} />
+            </Button>
+            <ReactionPicker onReact={handleReaction}>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className={`h-8 w-8 ${hasReacted('❤️') ? 'text-primary' : ''}`}
+              >
+                <Heart className="h-4 w-4" />
+              </Button>
+            </ReactionPicker>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8"
+              onClick={() => onReply(message)}
+            >
+              <Reply className="h-4 w-4" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={onPin}>
+                  {isPinned ? 'Unpin message' : 'Pin message'}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                  Edit message
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  className="text-destructive" 
+                  onClick={() => setIsDeleteAlertOpen(true)}
+                >
+                  Delete message
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
         {/* Avatar */}
-        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-          <img src={message.userAvatar} alt={message.userName} className="w-full h-full rounded-full object-cover" />
-        </div>
-
+        {!isOwnMessage && (
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <img src={message.userAvatar} alt={message.userName} className="w-full h-full rounded-full object-cover" />
+          </div>
+        )}
         {/* Message Content */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-2 mb-1">
-            <span className="font-semibold text-sm">{message.userName || 'Unknown User'}</span>
-            <span className="text-xs text-muted-foreground">{formatRelativeTime(message.timestamp)}</span>
+          <div className={`flex items-baseline gap-2 mb-1 ${isOwnMessage ? 'justify-end text-right' : ''}`}>
+            {isOwnMessage ? (
+              <>
+                <span className="text-xs text-muted-foreground">{formatRelativeTime(message.timestamp)}</span>
+                <span className="font-semibold text-sm">{message.userName || 'Unknown User'}</span>
+              </>
+            ) : (
+              <>
+                <span className="font-semibold text-sm">{message.userName || 'Unknown User'}</span>
+                <span className="text-xs text-muted-foreground">{formatRelativeTime(message.timestamp)}</span>
+              </>
+            )}
             {message.isUrgent && (
               <Badge variant="destructive" className="text-xs">
                 Urgent
@@ -200,10 +264,15 @@ const MessageItem = ({
             </Button>
           )}
         </div>
-
-        {/* Message Actions */}
-        {showActions && !isEditing && (
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Avatar for own message (optional, can be omitted for classic chat look) */}
+        {isOwnMessage && (
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <img src={message.userAvatar} alt={message.userName} className="w-full h-full rounded-full object-cover" />
+          </div>
+        )}
+        {/* Message Actions for left-aligned messages */}
+        {!isOwnMessage && (
+          <div className={`flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity`}>
             <Button 
               variant="ghost" 
               size="icon" 
@@ -229,7 +298,7 @@ const MessageItem = ({
             >
               <Reply className="h-4 w-4" />
             </Button>
-            <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+            <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8">
                   <MoreHorizontal className="h-4 w-4" />
@@ -238,16 +307,6 @@ const MessageItem = ({
               <DropdownMenuContent>
                 <DropdownMenuItem onClick={onPin}>
                   {isPinned ? 'Unpin message' : 'Pin message'}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setIsEditing(true)}>
-                  Edit message
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  className="text-destructive" 
-                  onClick={() => setIsDeleteAlertOpen(true)}
-                >
-                  Delete message
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
