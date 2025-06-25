@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { Send, Plus, Smile, Image, Bell } from "lucide-react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { Send, Plus, Smile, Image, Bell, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import type { Message, Channel } from "@/pages/Messages";
 import ThreadModal from './ThreadModal';
 import PinnedMessagesModal from './PinnedMessagesModal';
 import { useAuth } from "@/contexts/AuthContext";
+import { channel_auto_reply } from '@/util/ai-api-helpers';
 
 interface MessageThreadProps {
   messages: Message[];
@@ -22,12 +23,34 @@ interface MessageThreadProps {
   sendMessage: (msg: Partial<Message> & { updateType?: 'reaction' | 'new' | 'edit' | 'delete' }) => void;
 }
 
+// Helper for random badge colors
+const BADGE_COLORS = [
+  'bg-green-100 text-green-800',
+  'bg-blue-100 text-blue-800',
+  'bg-yellow-100 text-yellow-800',
+  'bg-purple-100 text-purple-800',
+  'bg-pink-100 text-pink-800',
+  'bg-orange-100 text-orange-800',
+  'bg-red-100 text-red-800',
+  'bg-cyan-100 text-cyan-800',
+  'bg-teal-100 text-teal-800',
+  'bg-indigo-100 text-indigo-800',
+  'bg-fuchsia-100 text-fuchsia-800',
+  'bg-lime-100 text-lime-800',
+  'bg-amber-100 text-amber-800',
+  'bg-rose-100 text-rose-800',
+  'bg-gray-200 text-gray-700',
+];
+
 const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMessages, onPinMessage, onUnpinMessage, sendMessage }: MessageThreadProps) => {
   const { user } = useAuth();
   const [newMessage, setNewMessage] = useState("");
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showPinnedModal, setShowPinnedModal] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState([]);
+  const [showAiDropdown, setShowAiDropdown] = useState(false);
+  const [loadingAi, setLoadingAi] = useState(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -47,7 +70,7 @@ const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMes
       
       sendMessage({
         content: newMessage,
-        replyTo: replyingTo ? replyingTo.id : undefined,
+        thread_parent_id: replyingTo ? replyingTo.id : undefined,
       });
       setNewMessage("");
       setReplyingTo(null);
@@ -149,6 +172,35 @@ const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMes
     });
   };
 
+  const handleAiSuggest = async () => {
+    setLoadingAi(true);
+    setShowAiDropdown(true);
+    setAiSuggestions([]);
+    try {
+      const res = await channel_auto_reply({ channel_id: channel.channel_id || channel.id, sender_id: user?.id });
+      if (res && Array.isArray(res.suggestions)) {
+        setAiSuggestions(res.suggestions);
+      } else {
+        setAiSuggestions([]);
+      }
+    } finally {
+      setLoadingAi(false);
+    }
+  };
+
+  const handleSelectSuggestion = (reply) => {
+    setNewMessage(reply);
+    setShowAiDropdown(false);
+  };
+
+  const badgeColorMap = useMemo(() => {
+    const map = {};
+    aiSuggestions.forEach((s, idx) => {
+      map[s.tone || idx] = BADGE_COLORS[idx % BADGE_COLORS.length];
+    });
+    return map;
+  }, [aiSuggestions]);
+
   // Filter messages based on channel type and IDs
   const channelMessages = messages.filter(msg => {
     if (channel.type === 'direct') {
@@ -191,10 +243,10 @@ const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMes
           {channelMessages.map((message) => (
             <div key={message.id}>
               {/* If this message is a reply, show the replied-to message above it */}
-              {message.replyTo && (
+              {message.thread_parent_id && (
                 <div className="mb-1 ml-4 pl-2 border-l-2 border-muted-foreground/30 text-xs text-muted-foreground">
                   {(() => {
-                    const repliedMsg = messages.find(m => m.id === message.replyTo);
+                    const repliedMsg = messages.find(m => m.id === message.thread_parent_id);
                     return repliedMsg ? <span><span className="font-semibold">{repliedMsg.userName}:</span> {repliedMsg.content}</span> : <span>Replied message not found</span>;
                   })()}
                 </div>
@@ -230,8 +282,35 @@ const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMes
             </Button>
           </div>
         )}
-        <div className="flex items-end gap-3">
+        <div className="flex items-end gap-3 relative">
           <div className="flex-1">
+            {/* AI Suggestions Dropdown - now above the input */}
+            {showAiDropdown && (
+              <div className="absolute z-50 bottom-full mb-2 left-0 w-full bg-white dark:bg-slate-900 border border-border rounded-lg shadow-lg p-2 max-h-80 overflow-y-auto">
+                {loadingAi ? (
+                  <div className="text-center text-muted-foreground py-2">Loading suggestions...</div>
+                ) : aiSuggestions.length > 0 ? (
+                  aiSuggestions.map((s, idx) => (
+                    <button
+                      key={idx}
+                      className="block w-full text-left px-4 py-2 hover:bg-blue-100 dark:hover:bg-slate-800 rounded transition-colors flex items-center gap-2"
+                      onClick={() => handleSelectSuggestion(s.reply)}
+                    >
+                      <span className="font-medium flex-1">{s.reply}</span>
+                      {/* Random color badge for tone/response type */}
+                      <span
+                        className={`inline-block text-xs font-semibold px-2 py-1 rounded-full ${badgeColorMap[s.tone || idx]}`}
+                      >
+                        {s.tone || 'default'}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="text-center text-muted-foreground py-2">No suggestions found.</div>
+                )}
+                <button className="block w-full text-center text-xs text-blue-600 mt-2 hover:underline" onClick={() => setShowAiDropdown(false)}>Close</button>
+              </div>
+            )}
             <Textarea
               value={newMessage}
               onChange={(e) => {
@@ -265,6 +344,16 @@ const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMes
                 <Smile className="h-4 w-4" />
               </Button>
             </EmojiPicker>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10"
+              onClick={handleAiSuggest}
+              title="AI Suggestions"
+            >
+              <Sparkles className="h-5 w-5" />
+            </Button>
             <Button 
               onClick={handleSendMessage}
               disabled={!newMessage.trim()}

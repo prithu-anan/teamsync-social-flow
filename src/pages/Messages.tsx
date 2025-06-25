@@ -62,6 +62,77 @@ export interface User {
   avatar?: string;
 }
 
+const ChannelInfoSidebar = ({ channel }) => {
+  const { user } = useAuth();
+  const [users, setUsers] = useState<User[]>([]);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const response = await getUsers();
+      if (response && Array.isArray(response.data)) {
+        setUsers(response.data);
+      } else if (Array.isArray(response)) {
+        setUsers(response);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  if (!channel) return null;
+  if (channel.type === 'direct') {
+    return (
+      <aside style={{ width: 300, minWidth: 250, minHeight: 'calc(100vh - 8rem)', maxHeight: 'calc(100vh - 8rem)' }}
+        className="border-l border-border bg-white/70 dark:bg-slate-900/70 p-8 flex flex-col gap-6 shadow-2xl">
+        <div>
+          <h2 className="text-xl font-bold mb-4">Direct Message</h2>
+          <div className="mb-2 text-lg font-semibold">{channel.name}</div>
+        </div>
+      </aside>
+    );
+  }
+  // Map participant IDs to user names and avatars
+  const memberObjs = (channel.participants || []).map(pid => {
+    const u = users.find(u => String(u.id) === String(pid));
+    return u ? { name: u.name, avatar: u.avatar } : { name: pid, avatar: undefined };
+  });
+
+  return (
+    <aside style={{ width: 300, minWidth: 250, minHeight: 'calc(100vh - 8rem)', maxHeight: 'calc(100vh - 8rem)' }}
+      className="border-l border-border bg-white/70 dark:bg-slate-900/70 p-8 flex flex-col gap-6 shadow-2xl">
+      <div>
+        <h2 className="text-xl font-bold mb-4">Channel Info</h2>
+        <div className="mb-4 text-lg font-semibold">{channel.name}</div>
+      </div>
+      <div className="flex-1 min-h-0">
+        <h3 className="font-semibold mb-3 text-base">Members</h3>
+        <ScrollArea className="max-h-60 min-h-0 pr-2">
+          <div className="flex flex-col gap-3">
+            {memberObjs.length > 0 ? (
+              memberObjs.map((member, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-3 p-2 rounded-lg transition-colors cursor-pointer hover:bg-blue-100/60 dark:hover:bg-slate-800/40 group"
+                >
+                  <img
+                    src={member.avatar || '/placeholder.svg'}
+                    alt={member.name}
+                    className="w-8 h-8 rounded-full object-cover border border-border bg-white"
+                  />
+                  <span className="text-base font-semibold text-gray-800 dark:text-gray-100 group-hover:text-blue-700 dark:group-hover:text-blue-300 truncate">
+                    {member.name}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="text-muted-foreground">No members listed</div>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+    </aside>
+  );
+};
+
 const Messages = () => {
   const { user } = useAuth();
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
@@ -303,12 +374,12 @@ const Messages = () => {
     fetchChannels();
   }, []);
 
-  // Filter channels based on active tab and search query
-  const filteredChannels = allChannels.filter(channel => {
-    const matchesSearch = channel.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesTab = activeTab === 'dms' ? channel.type === 'direct' : channel.type === 'group';
-    return matchesSearch && matchesTab;
-  });
+  // Filter channels for sidebar based on membership, activeTab, and search query
+  const filteredChannels = allChannels.filter(c =>
+    c.participants && c.participants.includes(user?.id?.toString()) &&
+    (activeTab === 'dms' ? c.type === 'direct' : c.type === 'group') &&
+    c.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   // Compute sidebar channels with live preview and unread
   const sidebarChannels = filteredChannels.map(channel => {
@@ -427,7 +498,7 @@ const Messages = () => {
           response = await sendMessage(selectedChannel.channel_id, { 
             content: msg.content.trim(),
             recipient_id: selectedChannel.recipient_id || null,
-            thread_parent_id: msg.replyTo || null
+            thread_parent_id: msg.thread_parent_id || null
           });
         } else {
           console.error("Invalid channel configuration for sending message");
@@ -603,11 +674,11 @@ const Messages = () => {
   };
 
   return (
-    <>
-      <WaterBackground />
-      <div className="flex h-[calc(100vh-8rem)] bg-white/10 backdrop-blur-sm">
+    <div className="flex h-full min-h-0">
+      {/* Sidebar and main chat area */}
+      <div className="flex-1 flex min-h-0">
         {/* Channel Sidebar - Fixed height with internal scrolling */}
-        <div className="w-80 border-r border-border bg-white/50 dark:bg-slate-900 flex flex-col min-h-0">
+        <div className="w-80 border-r border-border bg-white/50 dark:bg-slate-900 flex flex-col min-h-0" style={{ minHeight: 'calc(100vh - 8rem)', maxHeight: 'calc(100vh - 8rem)' }}>
           {/* Fixed header */}
           <div className="p-4 border-b border-border bg-background/50 flex-shrink-0">
             <div className="flex items-center justify-between mb-4">
@@ -626,7 +697,6 @@ const Messages = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="dms">Direct Messages</TabsTrigger>
@@ -634,21 +704,14 @@ const Messages = () => {
               </TabsList>
             </Tabs>
           </div>
-          
           {/* Scrollable conversation list */}
           <ScrollArea className="flex-1 min-h-0 conversation-scroll-area">
-            {loading ? (
-              <div className="p-4 text-center text-muted-foreground">
-                Loading conversations...
-              </div>
-            ) : (
-              <ChannelSidebar 
-                channels={sidebarChannels} 
-                selectedChannel={selectedChannel}
-                onChannelSelect={handleChannelSelect}
-                searchQuery={searchQuery}
-              />
-            )}
+            <ChannelSidebar
+              channels={filteredChannels}
+              selectedChannel={selectedChannel}
+              onChannelSelect={handleChannelSelect}
+              searchQuery={searchQuery}
+            />
           </ScrollArea>
         </div>
 
@@ -734,7 +797,9 @@ const Messages = () => {
           )}
         </div>
       </div>
-    </>
+      {/* Right sidebar for channel info */}
+      <ChannelInfoSidebar channel={selectedChannel} />
+    </div>
   );
 };
 

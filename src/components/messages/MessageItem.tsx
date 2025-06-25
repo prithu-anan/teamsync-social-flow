@@ -169,7 +169,13 @@ const MessageItem = ({
           </div>
 
           {!isEditing ? (
-            <div className="text-sm leading-relaxed break-words">
+            <div
+              className={`text-sm leading-relaxed break-words px-4 py-2 rounded-2xl shadow-sm max-w-xl inline-block ${
+                isOwnMessage
+                  ? 'bg-blue-100/80 text-right rounded-br-md'
+                  : 'bg-white/80 text-left rounded-bl-md'
+              }`}
+            >
               {message.content}
             </div>
           ) : (
