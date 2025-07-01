@@ -5,3 +5,13 @@ services:
     ports:
       - "3000:80"
     restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD-SHELL",
+        "curl -fsS http://135.235.169.115:8080/api/health || exit 1 && \
+         curl -fsS http://135.235.169.115:8000/health || exit 1"
+      ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
