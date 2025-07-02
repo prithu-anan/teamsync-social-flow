@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { getTasks } from "@/util/api-helpers";
+import { getTasks } from "@/utils/api-helpers";
 
 interface Task {
   id: string;

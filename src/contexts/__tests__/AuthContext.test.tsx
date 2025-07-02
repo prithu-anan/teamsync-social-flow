@@ -4,7 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from '../AuthContext';
 import { toast } from '../../components/ui/use-toast';
-import * as apiHelpers from '../../util/api-helpers';
+import * as apiHelpers from '../../utils/api-helpers';
 
 // Mock the API helpers inline in the factory
 vi.mock('../../util/api-helpers', () => ({

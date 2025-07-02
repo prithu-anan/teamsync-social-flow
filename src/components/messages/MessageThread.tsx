@@ -10,7 +10,7 @@ import type { Message, Channel } from "@/pages/Messages";
 import ThreadModal from './ThreadModal';
 import PinnedMessagesModal from './PinnedMessagesModal';
 import { useAuth } from "@/contexts/AuthContext";
-import { channel_auto_reply } from '@/util/ai-api-helpers';
+import { channel_auto_reply } from '@/utils/ai-api-helpers';
 
 interface MessageThreadProps {
   messages: Message[];

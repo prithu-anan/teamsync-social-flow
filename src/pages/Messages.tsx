@@ -17,7 +17,7 @@ import {
   getUsers,
   editMessage,
   deleteMessage
-} from "@/util/api-helpers";
+} from "@/utils/api-helpers";
 import { toast } from "@/components/ui/use-toast";
 
 export interface Channel {

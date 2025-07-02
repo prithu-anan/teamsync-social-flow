@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
 import { toast } from "@/components/ui/use-toast";
-import { getMe, login as loginApi, signup as signupApi } from "@/util/api-helpers";
+import { getMe, login as loginApi, signup as signupApi } from "@/utils/api-helpers";
 
 interface User {
   id: string;
