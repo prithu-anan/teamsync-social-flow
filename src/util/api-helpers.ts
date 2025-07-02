@@ -7,7 +7,7 @@ export const signup = async (req) => {
     try {
         const res = await axios.post(`${API_BASE_URL}/auth/register`, { name: req.name, email: req.email, password: req.password });
 
-        if (res.status === 200) {
+        if (res.status === 200 || res.status === 201) {
             return res.data;
         }
 

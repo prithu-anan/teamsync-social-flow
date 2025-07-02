@@ -88,32 +88,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     password: string
   ): Promise<boolean> => {
     const res = await signupApi({ name, email, password });
+    
 
-    if (res.error) {
+    // Handle both direct and nested response
+    const result = res?.code ? res : res?.data;
+
+    if (result && result.code === 201 && result.data) {
       toast({
-        title: "Signup failed",
-        description: res.error,
-        variant: "destructive",
+        title: "Account created successfully",
+        description: "Please log in with your new account.",
       });
-      return false;
+      return true;
     }
 
-    const newUser = {
-      id: res.data.id,
-      name,
-      email,
-      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0D8ABC&color=fff`,
-    };
-
-    setUser(newUser);
-    localStorage.setItem("teamsync_user", JSON.stringify(newUser));
+    let errorMsg = "An error occurred during signup.";
+    if (typeof res?.message === "string") {
+      errorMsg = res.message;
+    } else if (typeof res?.error === "string") {
+      errorMsg = res.error;
+    }
 
     toast({
-      title: "Account created",
-      description: `Welcome to TeamSync, ${name}!`,
+      title: "Signup failed",
+      description: errorMsg,
+      variant: "destructive",
     });
-
-    return true;
+    return false;
   };
 
   const logout = () => {

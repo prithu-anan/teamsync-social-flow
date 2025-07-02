@@ -180,7 +180,7 @@ describe('Signup Component', () => {
     });
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/');
+      expect(mockNavigate).toHaveBeenCalledWith('/login');
     });
   });
 
@@ -213,7 +213,7 @@ describe('Signup Component', () => {
     });
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/');
+      expect(mockNavigate).toHaveBeenCalledWith('/login');
     });
   });
 
