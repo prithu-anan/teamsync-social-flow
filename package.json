@@ -20,6 +20,7 @@
     "test:e2e:debug": "playwright test --debug --workers=1"
   },
   "dependencies": {
+    "@azure/storage-blob": "^12.27.0",
     "@hello-pangea/dnd": "^18.0.1",
     "@hookform/resolvers": "^3.9.0",
     "@radix-ui/react-accordion": "^1.2.0",
