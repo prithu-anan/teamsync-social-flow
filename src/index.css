@@ -246,3 +246,76 @@
 .animate-water-bg {
   animation: waterGradient 18s ease-in-out infinite alternate;
 }
+
+/* Chatbot markdown styles */
+.chatbot-prose {
+  @apply text-sm leading-relaxed;
+}
+
+.chatbot-prose p {
+  @apply mb-2 last:mb-0;
+}
+
+.chatbot-prose ul {
+  @apply list-disc list-inside mb-2 space-y-1;
+}
+
+.chatbot-prose ol {
+  @apply list-decimal list-inside mb-2 space-y-1;
+}
+
+.chatbot-prose li {
+  @apply mb-1;
+}
+
+.chatbot-prose strong {
+  @apply font-semibold;
+}
+
+.chatbot-prose em {
+  @apply italic;
+}
+
+.chatbot-prose blockquote {
+  @apply border-l-4 border-blue-500 pl-4 italic bg-blue-50 p-2 rounded text-sm;
+}
+
+.chatbot-prose code {
+  @apply bg-gray-200 px-1 py-0.5 rounded text-xs font-mono;
+}
+
+.chatbot-prose pre {
+  @apply bg-gray-900 text-gray-100 p-3 rounded-lg overflow-x-auto my-2;
+}
+
+.chatbot-prose pre code {
+  @apply bg-transparent p-0 text-sm;
+}
+
+.chatbot-prose h1, .chatbot-prose h2, .chatbot-prose h3, .chatbot-prose h4, .chatbot-prose h5, .chatbot-prose h6 {
+  @apply font-semibold mb-2 mt-3 first:mt-0;
+}
+
+.chatbot-prose h1 { @apply text-lg; }
+.chatbot-prose h2 { @apply text-base; }
+.chatbot-prose h3 { @apply text-sm; }
+
+.chatbot-prose table {
+  @apply w-full border-collapse border border-gray-300 my-2;
+}
+
+.chatbot-prose th, .chatbot-prose td {
+  @apply border border-gray-300 px-2 py-1 text-xs;
+}
+
+.chatbot-prose th {
+  @apply bg-gray-100 font-semibold;
+}
+
+.chatbot-prose a {
+  @apply text-blue-600 underline;
+}
+
+.chatbot-prose hr {
+  @apply border-gray-300 my-3;
+}

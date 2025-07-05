@@ -119,7 +119,7 @@ export const get_chat_history = async ({ userId, size }) => {
             },
             {
                 "id": 1,
-                "type": "user",
+                "type": "ai",
                 "content": "I hope you remember me. can you tell me about Prithu Anan",
                 "timestamp": null
             },

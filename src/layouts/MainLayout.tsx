@@ -5,6 +5,7 @@ import AppSidebar from "@/components/AppSidebar";
 import Header from "@/components/Header";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import WaterBackground from '@/components/WaterBackground';
+import FloatingChatbot from '@/components/FloatingChatbot';
 
 const MainLayout = () => {
   const { isAuthenticated } = useAuth();
@@ -39,6 +40,7 @@ const MainLayout = () => {
             <Outlet />
           </main>
         </div>
+        <FloatingChatbot />
       </div>
     </SidebarProvider>
   );
