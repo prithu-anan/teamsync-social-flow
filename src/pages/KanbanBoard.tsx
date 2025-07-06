@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Check, Clock, Plus, Filter } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,8 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
-import { getTasks } from "@/utils/api-helpers";
+import { getUserTasks } from "@/utils/api/tasks-api";
+import { updateTask } from "@/utils/api/tasks-api";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/use-toast";
 
@@ -63,68 +64,91 @@ function groupTasksByStatus(tasks: KanbanTask[]) {
   }, {} as Record<string, KanbanTask[]>);
 }
 
+const dueDateOptions = [
+  { label: "All", value: "all" },
+  { label: "Overdue", value: "overdue" },
+  { label: "Today", value: "today" },
+  { label: "This Week", value: "week" },
+  { label: "Future", value: "future" },
+];
+
 const KanbanBoard = () => {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<KanbanTask[]>([]);
   const [columns, setColumns] = useState<Record<string, KanbanTask[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState({
+    priority: [], // ["low", "medium", "high"]
+    assignee: [], // [assignee names]
+    dueDate: "all", // "all", "overdue", "today", "week", "future"
+    tags: [], // [tag strings]
+  });
 
   useEffect(() => {
     const fetchTasks = async () => {
-      if (!user) {
+      // Get userId from localStorage
+      let userId = null;
+      try {
+        const userStr = localStorage.getItem('teamsync_user');
+        if (userStr) {
+          const userObj = JSON.parse(userStr);
+          userId = userObj.id;
+        }
+      } catch (e) {
+        console.error('Failed to parse teamsync_user from localStorage:', e);
+      }
+      if (!userId) {
         setLoading(false);
         setError("You must be logged in to view tasks.");
         return;
       }
-
       setLoading(true);
       try {
-        const response = await getTasks();
-
+        const response = await getUserTasks(userId);
         if (response.error) {
           toast({ title: "Error", description: response.error, variant: "destructive" });
           setError("Failed to fetch tasks.");
           setTasks([]);
         } else {
-          // The API response might be an object with a 'tasks' or 'data' key
           const tasksData = response.tasks || response.data || response;
           if (Array.isArray(tasksData)) {
-            // Map the backend response to the KanbanTask interface
-            const formattedTasks = tasksData.map(task => ({
-              id: task.id.toString(),
-              title: task.title,
-              description: task.description,
-              status: task.status?.toLowerCase().replace(/\s+/g, '-') || 'todo',
-              priority: task.priority?.toLowerCase() || 'medium',
-              assignee: task.assignee ? {
-                name: task.assignee.name,
-                avatar: task.assignee.profile_picture || `https://ui-avatars.com/api/?name=${task.assignee.name.replace(/\s+/g, '+')}&background=random`
-              } : undefined,
-              dueDate: task.due_date,
-              tags: task.tags || [],
-              comments: task.comments_count || 0,
-              attachments: task.attachments_count || 0,
-            }));
+            const formattedTasks = tasksData.map((task, index) => {
+              if (!task.id) {
+                return null;
+              }
+              return {
+                id: task.id.toString(),
+                title: task.title,
+                description: task.description,
+                status: task.status?.toLowerCase().replace(/\s+/g, '-') || 'todo',
+                priority: task.priority?.toLowerCase() || 'medium',
+                assignee: task.assignee ? {
+                  name: task.assignee.name,
+                  avatar: task.assignee.profile_picture || `https://ui-avatars.com/api/?name=${task.assignee.name.replace(/\s+/g, '+')}&background=random`
+                } : undefined,
+                dueDate: task.due_date,
+                tags: task.tags || [],
+                comments: task.comments_count || 0,
+                attachments: task.attachments_count || 0,
+              };
+            }).filter(task => task !== null);
             setTasks(formattedTasks);
             setColumns(groupTasksByStatus(formattedTasks));
           } else {
-            console.error("Fetched tasks data is not an array:", tasksData);
             setError("Received an invalid format for tasks.");
             setTasks([]);
           }
         }
       } catch (err) {
-        console.error("An error occurred while fetching tasks:", err);
         setError("An unexpected error occurred.");
         setTasks([]);
       } finally {
         setLoading(false);
       }
     };
-
     fetchTasks();
-  }, [user]);
+  }, []);
 
   // Get color based on priority
   const getPriorityColor = (priority: string) => {
@@ -160,15 +184,25 @@ const KanbanBoard = () => {
   };
 
   // DnD handler
-  const onDragEnd = (result: DropResult) => {
+  const onDragEnd = async (result: DropResult) => {
     const { source, destination } = result;
-    if (!destination) return;
-    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+    
+    if (!destination) {
+      return;
+    }
+    
+    if (source.droppableId === destination.droppableId && source.index === destination.index) {
+      return;
+    }
+    
     const sourceCol = source.droppableId;
     const destCol = destination.droppableId;
+    
     const sourceTasks = Array.from(columns[sourceCol]);
     const destTasks = Array.from(columns[destCol]);
+    
     const [removed] = sourceTasks.splice(source.index, 1);
+    
     if (sourceCol === destCol) {
       sourceTasks.splice(destination.index, 0, removed);
       setColumns({ ...columns, [sourceCol]: sourceTasks });
@@ -180,8 +214,94 @@ const KanbanBoard = () => {
         [sourceCol]: sourceTasks,
         [destCol]: destTasks,
       });
+      
+      // Map KanbanTask to backend task object
+      const backendTask = {
+        id: removed.id,
+        title: removed.title,
+        description: removed.description,
+        status: destCol,
+        priority: removed.priority,
+        due_date: removed.dueDate,
+        tags: removed.tags,
+        assignee: removed.assignee
+          ? {
+              name: removed.assignee.name,
+              profile_picture: removed.assignee.avatar,
+            }
+          : undefined,
+        // Comments and attachments are usually not updated here
+      };
+      
+      // Ensure we have a valid task ID
+      const taskId = parseInt(removed.id, 10);
+      
+      if (isNaN(taskId)) {
+        toast({ title: "Error", description: "Invalid task ID", variant: "destructive" });
+        return;
+      }
+      
+      // Additional safety check - ensure we're not accidentally passing a droppable ID
+      if (removed.id === 'user' || removed.id === 'todo' || removed.id === 'in_progress' || removed.id === 'in_review' || removed.id === 'completed') {
+        toast({ title: "Error", description: "Invalid task ID - appears to be a column ID", variant: "destructive" });
+        return;
+      }
+      
+      try {
+        const response = await updateTask(taskId, backendTask);
+        if (response.error) {
+          toast({ title: "Error", description: response.error?.message || String(response.error), variant: "destructive" });
+        } else {
+          toast({ title: "Task updated", description: `Task moved to ${columnNames[destCol]}` });
+        }
+      } catch (err) {
+        toast({ title: "Error", description: "Failed to update task status", variant: "destructive" });
+      }
     }
   };
+
+  // Get unique assignees and tags from tasks
+  const assigneeOptions = useMemo(() => {
+    const names = new Set();
+    tasks.forEach(t => t.assignee && names.add(t.assignee.name));
+    return Array.from(names);
+  }, [tasks]);
+  const tagOptions = useMemo(() => {
+    const tags = new Set();
+    tasks.forEach(t => t.tags && t.tags.forEach(tag => tags.add(tag)));
+    return Array.from(tags);
+  }, [tasks]);
+
+  // Filtering logic
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(task => {
+      // Priority
+      if (filter.priority.length && !filter.priority.includes(task.priority)) return false;
+      // Assignee
+      if (filter.assignee.length && (!task.assignee || !filter.assignee.includes(task.assignee.name))) return false;
+      // Tags
+      if (filter.tags.length && (!task.tags || !task.tags.some(tag => filter.tags.includes(tag)))) return false;
+      // Due Date
+      if (filter.dueDate !== "all" && task.dueDate) {
+        const today = new Date();
+        const due = new Date(task.dueDate);
+        if (filter.dueDate === "overdue" && due >= today) return false;
+        if (filter.dueDate === "today" && (due.getDate() !== today.getDate() || due.getMonth() !== today.getMonth() || due.getFullYear() !== today.getFullYear())) return false;
+        if (filter.dueDate === "week") {
+          const weekStart = new Date(today);
+          weekStart.setDate(today.getDate() - today.getDay());
+          const weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekStart.getDate() + 6);
+          if (due < weekStart || due > weekEnd) return false;
+        }
+        if (filter.dueDate === "future" && due <= today) return false;
+      }
+      return true;
+    });
+  }, [tasks, filter]);
+
+  // Group filtered tasks by status
+  const filteredColumns = useMemo(() => groupTasksByStatus(filteredTasks), [filteredTasks]);
 
   if (loading) {
     return (
@@ -214,15 +334,84 @@ const KanbanBoard = () => {
               <Button variant="outline" className="space-x-2">
                 <Filter className="h-4 w-4" />
                 <span>Filter</span>
+                {(filter.priority.length || filter.assignee.length || filter.tags.length || filter.dueDate !== "all") && (
+                  <span className="ml-2 text-xs text-blue-600">●</span>
+                )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>Filter by</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>Priority</DropdownMenuItem>
-              <DropdownMenuItem>Assignee</DropdownMenuItem>
-              <DropdownMenuItem>Due Date</DropdownMenuItem>
-              <DropdownMenuItem>Tags</DropdownMenuItem>
+            <DropdownMenuContent align="end" className="w-72 p-4 space-y-4">
+              <div>
+                <div className="font-semibold mb-2">Priority</div>
+                <div className="flex gap-2 flex-wrap">
+                  {["low", "medium", "high"].map(p => (
+                    <label key={p} className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={filter.priority.includes(p)}
+                        onChange={e => setFilter(f => ({ ...f, priority: e.target.checked ? [...f.priority, p] : f.priority.filter(x => x !== p) }))}
+                      />
+                      <span className="capitalize">{p}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="font-semibold mb-2">Assignee</div>
+                <div className="flex gap-2 flex-wrap">
+                  {assigneeOptions.length === 0 && <span className="text-xs text-muted-foreground">No assignees</span>}
+                  {assigneeOptions.map(name => (
+                    <label key={name} className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={filter.assignee.includes(name)}
+                        onChange={e => setFilter(f => ({ ...f, assignee: e.target.checked ? [...f.assignee, name] : f.assignee.filter(x => x !== name) }))}
+                      />
+                      <span>{name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="font-semibold mb-2">Due Date</div>
+                <div className="flex gap-2 flex-wrap">
+                  {dueDateOptions.map(opt => (
+                    <label key={opt.value} className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="dueDate"
+                        checked={filter.dueDate === opt.value}
+                        onChange={() => setFilter(f => ({ ...f, dueDate: opt.value }))}
+                      />
+                      <span>{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <div className="font-semibold mb-2">Tags</div>
+                <div className="flex gap-2 flex-wrap">
+                  {tagOptions.length === 0 && <span className="text-xs text-muted-foreground">No tags</span>}
+                  {tagOptions.map(tag => (
+                    <label key={tag} className="flex items-center gap-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={filter.tags.includes(tag)}
+                        onChange={e => setFilter(f => ({ ...f, tags: e.target.checked ? [...f.tags, tag] : f.tags.filter(x => x !== tag) }))}
+                      />
+                      <span>{tag}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="flex justify-end pt-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setFilter({ priority: [], assignee: [], dueDate: "all", tags: [] })}
+                >
+                  Clear Filters
+                </Button>
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button>
@@ -245,14 +434,14 @@ const KanbanBoard = () => {
                     <div className="flex items-center space-x-2">
                       <div className={`h-2 w-2 rounded-full ${columnColors[col]}`}></div>
                       <h3 className="font-semibold text-white">{columnNames[col]}</h3>
-                      <Badge variant="outline" className="bg-white/10 text-white border-white/20">{columns[col].length}</Badge>
+                      <Badge variant="outline" className="bg-white/10 text-white border-white/20">{filteredColumns[col]?.length || 0}</Badge>
                     </div>
                     <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
                   <div className="flex flex-col gap-3 flex-1 min-w-0">
-                    {columns[col].map((task, idx) => (
+                    {filteredColumns[col]?.map((task, idx) => (
                       <Draggable draggableId={task.id} index={idx} key={task.id}>
                         {(provided, snapshot) => (
                           <div

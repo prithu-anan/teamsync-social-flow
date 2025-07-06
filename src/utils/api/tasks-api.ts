@@ -51,7 +51,7 @@ export const createTask = async (req) => {
 
 export const updateTask = async (id, req) => {
     const token = localStorage.getItem("teamsync_jwt");
-
+    
     try {
         const res = await axios.put(`${API_BASE_URL}/tasks/${id}`, req, {
             headers: {
@@ -89,16 +89,14 @@ export const deleteTask = async (id) => {
     }
 }
 
-export const getUserTasks = async () => {
+export const getUserTasks = async (userId) => {
     const token = localStorage.getItem("teamsync_jwt");
-
     try {
-        const res = await axios.get(`${API_BASE_URL}/tasks/user`, {
+        const res = await axios.get(`${API_BASE_URL}/tasks?assigned_to=${userId}`, {
             headers: {
                 Authorization: `Bearer ${token}`,
             },
         });
-
         if (res.status === 200) {
             return res.data;
         }
