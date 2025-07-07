@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from '../AuthContext';
@@ -125,9 +125,12 @@ describe('AuthContext', () => {
     );
 
     const loginButton = screen.getByTestId('login-btn');
-    fireEvent.click(loginButton);
-    // Suppress unhandled rejection warning
-    await Promise.resolve().catch(() => {});
+    
+    await act(async () => {
+      fireEvent.click(loginButton);
+      // Suppress unhandled rejection warning
+      await Promise.resolve().catch(() => {});
+    });
 
     await waitFor(() => {
       expect(apiHelpers.login).toHaveBeenCalledWith({
@@ -169,9 +172,12 @@ describe('AuthContext', () => {
     );
 
     const loginButton = screen.getByTestId('login-btn');
-    fireEvent.click(loginButton);
-    // Suppress unhandled rejection warning
-    await Promise.resolve().catch(() => {});
+    
+    await act(async () => {
+      fireEvent.click(loginButton);
+      // Suppress unhandled rejection warning
+      await Promise.resolve().catch(() => {});
+    });
 
     await waitFor(() => {
       expect(apiHelpers.login).toHaveBeenCalledWith({
@@ -212,9 +218,12 @@ describe('AuthContext', () => {
     );
 
     const loginButton = screen.getByTestId('login-btn');
-    fireEvent.click(loginButton);
-    // Suppress unhandled rejection warning
-    await Promise.resolve().catch(() => {});
+    
+    await act(async () => {
+      fireEvent.click(loginButton);
+      // Suppress unhandled rejection warning
+      await Promise.resolve().catch(() => {});
+    });
 
     await waitFor(() => {
       expect(apiHelpers.login).toHaveBeenCalled();
@@ -245,9 +254,12 @@ describe('AuthContext', () => {
     );
 
     const signupButton = screen.getByTestId('signup-btn');
-    fireEvent.click(signupButton);
-    // Suppress unhandled rejection warning
-    await Promise.resolve().catch(() => {});
+    
+    await act(async () => {
+      fireEvent.click(signupButton);
+      // Suppress unhandled rejection warning
+      await Promise.resolve().catch(() => {});
+    });
 
     await waitFor(() => {
       // User should NOT be set after signup
@@ -269,9 +281,12 @@ describe('AuthContext', () => {
     );
 
     const signupButton = screen.getByTestId('signup-btn');
-    fireEvent.click(signupButton);
-    // Suppress unhandled rejection warning
-    await Promise.resolve().catch(() => {});
+    
+    await act(async () => {
+      fireEvent.click(signupButton);
+      // Suppress unhandled rejection warning
+      await Promise.resolve().catch(() => {});
+    });
 
     await waitFor(() => {
       expect(apiHelpers.signup).toHaveBeenCalledWith({

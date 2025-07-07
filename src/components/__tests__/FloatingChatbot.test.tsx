@@ -6,7 +6,7 @@ declare global {
 }
 window.HTMLElement.prototype.scrollIntoView = function () {};
 
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import FloatingChatbot from '../FloatingChatbot';
@@ -22,12 +22,16 @@ vi.mock('../../utils/api-helpers', () => ({
   getMe: vi.fn(),
 }));
 
-const renderWithRouter = (component: React.ReactElement) => {
-  return render(
-    <BrowserRouter>
-      {component}
-    </BrowserRouter>
-  );
+const renderWithRouter = async (component: React.ReactElement) => {
+  let result;
+  await act(async () => {
+    result = render(
+      <BrowserRouter>
+        {component}
+      </BrowserRouter>
+    );
+  });
+  return result;
 };
 
 describe('FloatingChatbot', () => {
@@ -64,8 +68,8 @@ describe('FloatingChatbot', () => {
     vi.clearAllMocks();
   });
 
-  it('renders floating chat button', () => {
-    renderWithRouter(<FloatingChatbot />);
+  it('renders floating chat button', async () => {
+    await renderWithRouter(<FloatingChatbot />);
     // The floating button should be present when chat is closed
     const chatButton = screen.getByRole('button');
     expect(chatButton).toBeInTheDocument();
@@ -74,27 +78,39 @@ describe('FloatingChatbot', () => {
   });
 
   it('opens chat window when button is clicked', async () => {
-    renderWithRouter(<FloatingChatbot />);
+    await renderWithRouter(<FloatingChatbot />);
     const chatButton = screen.getByRole('button');
-    fireEvent.click(chatButton);
+    
+    await act(async () => {
+      fireEvent.click(chatButton);
+    });
+    
     await waitFor(() => {
       expect(screen.getByText('AI Assistant')).toBeInTheDocument();
     });
   });
 
   it('shows welcome message when no chat history', async () => {
-    renderWithRouter(<FloatingChatbot />);
+    await renderWithRouter(<FloatingChatbot />);
     const chatButton = screen.getByRole('button');
-    fireEvent.click(chatButton);
+    
+    await act(async () => {
+      fireEvent.click(chatButton);
+    });
+    
     await waitFor(() => {
       expect(screen.getByText("Hello! I'm your AI assistant. How can I help you today?")).toBeInTheDocument();
     });
   });
 
   it('allows user to type and send messages', async () => {
-    renderWithRouter(<FloatingChatbot />);
+    await renderWithRouter(<FloatingChatbot />);
     const chatButton = screen.getByRole('button');
-    fireEvent.click(chatButton);
+    
+    await act(async () => {
+      fireEvent.click(chatButton);
+    });
+    
     // Wait for input to appear after opening chat
     await waitFor(() => {
       expect(screen.getByPlaceholderText('Type your message...')).toBeInTheDocument();
@@ -105,18 +121,26 @@ describe('FloatingChatbot', () => {
   });
 
   it('displays user name in header', async () => {
-    renderWithRouter(<FloatingChatbot />);
+    await renderWithRouter(<FloatingChatbot />);
     const chatButton = screen.getByRole('button');
-    fireEvent.click(chatButton);
+    
+    await act(async () => {
+      fireEvent.click(chatButton);
+    });
+    
     await waitFor(() => {
       expect(screen.getByText('Test User')).toBeInTheDocument();
     });
   });
 
   it('has clear history button', async () => {
-    renderWithRouter(<FloatingChatbot />);
+    await renderWithRouter(<FloatingChatbot />);
     const chatButton = screen.getByRole('button');
-    fireEvent.click(chatButton);
+    
+    await act(async () => {
+      fireEvent.click(chatButton);
+    });
+    
     await waitFor(() => {
       const clearButton = screen.getByText('Clear');
       expect(clearButton).toBeInTheDocument();

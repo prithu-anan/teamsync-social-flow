@@ -27,7 +27,11 @@ vi.mock('@/components/ui/button', () => ({
 vi.mock('@/components/ui/dropdown-menu', () => ({
   DropdownMenu: ({ children }: any) => <div>{children}</div>,
   DropdownMenuContent: ({ children }: any) => <div>{children}</div>,
-  DropdownMenuItem: ({ children, ...rest }: any) => <div {...rest}>{children}</div>,
+  DropdownMenuItem: ({ children, asChild, ...rest }: any) => {
+    // Remove asChild prop to avoid React warning
+    const { asChild: _, ...cleanProps } = rest;
+    return <div {...cleanProps}>{children}</div>;
+  },
   DropdownMenuLabel: ({ children }: any) => <div>{children}</div>,
   DropdownMenuSeparator: () => <hr />,
   DropdownMenuTrigger: ({ children }: any) => <div>{children}</div>,
