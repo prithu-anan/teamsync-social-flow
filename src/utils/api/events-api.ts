@@ -8,6 +8,7 @@ export const createEvent = async (req) => {
         const res = await axios.post(`${API_BASE_URL}/events`, req, {
             headers: {
                 Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
             },
         });
 

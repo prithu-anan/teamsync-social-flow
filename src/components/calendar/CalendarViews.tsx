@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, List, Sun, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,6 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectContent, SelectItem } from "@/components/ui/select";
+import { getEvents, createEvent } from "@/utils/api/events-api";
+import { getUsers } from "@/utils/api/users-api";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface Event {
   id: string;
@@ -21,15 +25,47 @@ const CalendarViews = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [addEventOpen, setAddEventOpen] = useState(false);
-  const [newEvent, setNewEvent] = useState({ title: '', date: '', time: '', type: 'meeting' });
+  const [newEvent, setNewEvent] = useState({ title: '', description: '', date: '', type: 'meeting', participants: [] });
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState([]);
+  const [userSearch, setUserSearch] = useState("");
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
 
-  // Mock events
-  const events: Event[] = [
-    { id: '1', title: 'Team Standup', time: '9:00 AM', type: 'meeting', participants: ['John', 'Sarah'] },
-    { id: '2', title: 'Design Review', time: '2:00 PM', type: 'meeting', participants: ['Alex', 'Mia'] },
-    { id: '3', title: 'Sarah\'s Birthday', time: 'All day', type: 'birthday' },
-    { id: '4', title: 'Project Deadline', time: '5:00 PM', type: 'task' },
-  ];
+  useEffect(() => {
+    const fetchEvents = async () => {
+      setLoading(true);
+      try {
+        const response = await getEvents();
+        if (response && !response.error) {
+          const eventsData = response.events || response.data || response;
+          if (Array.isArray(eventsData)) {
+            setEvents(eventsData);
+          } else {
+            setEvents([]);
+          }
+        } else {
+          setEvents([]);
+        }
+      } catch (err) {
+        setEvents([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchEvents();
+  }, []);
+
+  // Fetch users when add event form is shown
+  useEffect(() => {
+    if (addEventOpen || true) { // always fetch for now
+      getUsers().then(res => {
+        const usersData = res.users || res.data || res;
+        if (Array.isArray(usersData)) setUsers(usersData);
+        else setUsers([]);
+      });
+    }
+  }, [addEventOpen]);
 
   const getEventsByDate = (date: Date) => {
     // In a real app, you'd filter events by the selected date
@@ -79,10 +115,26 @@ const CalendarViews = () => {
     return new Date(2024, monthIndex, 1).toLocaleString('default', { month: 'long' });
   };
 
-  const handleAddEvent = () => {
-    // Add event logic here (e.g., update events array)
-    setAddEventOpen(false);
-    setNewEvent({ title: '', date: '', time: '', type: 'meeting' });
+  const handleAddEvent = async () => {
+    // Compose event data
+    const eventData = {
+      title: newEvent.title,
+      description: newEvent.description,
+      date: newEvent.date,
+      type: newEvent.type.toLowerCase(),
+      // Handle empty array case - send null or empty array based on backend preference
+      participant_ids: newEvent.participants.length > 0 ? newEvent.participants.map(Number) : [],
+    };
+    console.log('Submitting eventData:', eventData);
+    console.log('participant_ids type:', typeof eventData.participant_ids, 'value:', eventData.participant_ids);
+    const res = await createEvent(eventData);
+    console.log('API response:', res);
+    if (!res.error) {
+      setAddEventOpen(false);
+      setNewEvent({ title: '', description: '', date: '', type: 'meeting', participants: [] });
+      // Optionally refetch events
+      // ...
+    }
   };
 
   const upcomingEvents = events.slice(0, 3); // Replace with real logic for next events
@@ -151,14 +203,15 @@ const CalendarViews = () => {
                 onChange={e => setNewEvent({ ...newEvent, title: e.target.value })}
               />
               <Input
+                placeholder="Description"
+                value={newEvent.description}
+                onChange={e => setNewEvent({ ...newEvent, description: e.target.value })}
+                className="mb-2"
+              />
+              <Input
                 type="date"
                 value={newEvent.date}
                 onChange={e => setNewEvent({ ...newEvent, date: e.target.value })}
-              />
-              <Input
-                type="time"
-                value={newEvent.time}
-                onChange={e => setNewEvent({ ...newEvent, time: e.target.value })}
               />
               <Select value={newEvent.type} onValueChange={val => setNewEvent({ ...newEvent, type: val })}>
                 <SelectTrigger>
@@ -171,6 +224,65 @@ const CalendarViews = () => {
                   <SelectItem value="event">Event</SelectItem>
                 </SelectContent>
               </Select>
+              {/* Member selection dropdown */}
+              <div className="relative">
+                <Button type="button" variant="outline" className="w-full mb-2" onClick={() => setUserDropdownOpen(v => !v)}>
+                  {newEvent.participants.length > 0
+                    ? `${newEvent.participants.length} member(s) selected`
+                    : "Add Members"}
+                </Button>
+                {userDropdownOpen && (
+                  <div className="absolute z-10 bg-popover border rounded-md w-full max-h-60 overflow-y-auto shadow-lg p-2">
+                    <Input
+                      placeholder="Search members..."
+                      value={userSearch}
+                      onChange={e => setUserSearch(e.target.value)}
+                      className="mb-2"
+                    />
+                    {users.filter(u => u.name.toLowerCase().includes(userSearch.toLowerCase())).map(user => (
+                      <div key={user.id} className="flex items-center gap-2 py-1 px-2 hover:bg-accent rounded cursor-pointer">
+                        <Checkbox
+                          checked={newEvent.participants.includes(user.id)}
+                          onCheckedChange={checked => {
+                            setNewEvent(ev => ({
+                              ...ev,
+                              participants: checked
+                                ? [...ev.participants, user.id]
+                                : ev.participants.filter(id => id !== user.id)
+                            }));
+                          }}
+                          id={`user-${user.id}`}
+                        />
+                        <Avatar className="h-6 w-6">
+                          {user.profile_picture ? (
+                            <AvatarImage src={user.profile_picture} alt={user.name} />
+                          ) : null}
+                          <AvatarFallback>{user.name ? user.name.split(" ").map(n => n[0]).join("") : "M"}</AvatarFallback>
+                        </Avatar>
+                        <span>{user.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* Show selected members as chips */}
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {newEvent.participants.map(pid => {
+                    const user = users.find(u => u.id === pid);
+                    if (!user) return null;
+                    return (
+                      <span key={pid} className="flex items-center gap-1 px-2 py-1 bg-accent rounded text-xs">
+                        <Avatar className="h-4 w-4">
+                          {user.profile_picture ? (
+                            <AvatarImage src={user.profile_picture} alt={user.name} />
+                          ) : null}
+                          <AvatarFallback>{user.name ? user.name.split(" ").map(n => n[0]).join("") : "M"}</AvatarFallback>
+                        </Avatar>
+                        {user.name}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
               <Button onClick={handleAddEvent} className="w-full">Add Event</Button>
             </Card>
 
