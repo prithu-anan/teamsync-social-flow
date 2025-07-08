@@ -16,6 +16,7 @@ vi.mock('../../utils/ai-api-helpers', () => ({
   send_message: vi.fn(),
   get_chat_history: vi.fn(),
   clear_chat_history: vi.fn(),
+  get_context: vi.fn(),
 }));
 
 vi.mock('../../utils/api-helpers', () => ({
@@ -62,6 +63,13 @@ describe('FloatingChatbot', () => {
     vi.mocked(aiApiHelpers.clear_chat_history).mockResolvedValue({
       message: 'Chat history cleared for user 1'
     });
+
+    // Mock successful context fetch
+    vi.mocked(aiApiHelpers.get_context).mockResolvedValue([
+      'suhas_profile_chunks',
+      'about_us',
+      'code_pilot'
+    ]);
   });
 
   afterEach(() => {
