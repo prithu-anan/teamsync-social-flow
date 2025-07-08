@@ -85,68 +85,70 @@ const KanbanBoard = () => {
     tags: [], // [tag strings]
   });
 
-  useEffect(() => {
-    const fetchTasks = async () => {
-      // Get userId from localStorage
-      let userId = null;
-      try {
-        const userStr = localStorage.getItem('teamsync_user');
-        if (userStr) {
-          const userObj = JSON.parse(userStr);
-          userId = userObj.id;
-        }
-      } catch (e) {
-        console.error('Failed to parse teamsync_user from localStorage:', e);
+  // Move fetchTasks outside useEffect so it can be reused
+  const fetchTasks = async () => {
+    // Get userId from localStorage
+    let userId = null;
+    try {
+      const userStr = localStorage.getItem('teamsync_user');
+      if (userStr) {
+        const userObj = JSON.parse(userStr);
+        userId = userObj.id;
       }
-      if (!userId) {
-        setLoading(false);
-        setError("You must be logged in to view tasks.");
-        return;
-      }
-      setLoading(true);
-      try {
-        const response = await getUserTasks(userId);
-        if (response.error) {
-          toast({ title: "Error", description: response.error, variant: "destructive" });
-          setError("Failed to fetch tasks.");
-          setTasks([]);
-        } else {
-          const tasksData = response.tasks || response.data || response;
-          if (Array.isArray(tasksData)) {
-            const formattedTasks = tasksData.map((task, index) => {
-              if (!task.id) {
-                return null;
-              }
-              return {
-                id: task.id.toString(),
-                title: task.title,
-                description: task.description,
-                status: task.status?.toLowerCase().replace(/\s+/g, '-') || 'todo',
-                priority: task.priority?.toLowerCase() || 'medium',
-                assignee: task.assignee ? {
-                  name: task.assignee.name,
-                  avatar: task.assignee.profile_picture || `https://ui-avatars.com/api/?name=${task.assignee.name.replace(/\s+/g, '+')}&background=random`
-                } : undefined,
-                dueDate: task.due_date,
-                tags: task.tags || [],
-                comments: task.comments_count || 0,
-                attachments: task.attachments_count || 0,
-              };
-            }).filter(task => task !== null);
-            setTasks(formattedTasks);
-            setColumns(groupTasksByStatus(formattedTasks));
-          } else {
-            setError("Received an invalid format for tasks.");
-            setTasks([]);
-          }
-        }
-      } catch (err) {
-        setError("An unexpected error occurred.");
+    } catch (e) {
+      console.error('Failed to parse teamsync_user from localStorage:', e);
+    }
+    if (!userId) {
+      setLoading(false);
+      setError("You must be logged in to view tasks.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await getUserTasks(userId);
+      if (response.error) {
+        toast({ title: "Error", description: response.error, variant: "destructive" });
+        setError("Failed to fetch tasks.");
         setTasks([]);
-      } finally {
-        setLoading(false);
+      } else {
+        const tasksData = response.tasks || response.data || response;
+        if (Array.isArray(tasksData)) {
+          const formattedTasks = tasksData.map((task, index) => {
+            if (!task.id) {
+              return null;
+            }
+            return {
+              id: task.id.toString(),
+              title: task.title,
+              description: task.description,
+              status: task.status?.toLowerCase().replace(/\s+/g, '-') || 'todo',
+              priority: task.priority?.toLowerCase() || 'medium',
+              assignee: task.assignee ? {
+                name: task.assignee.name,
+                avatar: task.assignee.profile_picture || `https://ui-avatars.com/api/?name=${task.assignee.name.replace(/\s+/g, '+')}&background=random`
+              } : undefined,
+              dueDate: task.due_date,
+              tags: task.tags || [],
+              comments: task.comments_count || 0,
+              attachments: task.attachments_count || 0,
+            };
+          }).filter(task => task !== null);
+          setTasks(formattedTasks);
+          setColumns(groupTasksByStatus(formattedTasks));
+        } else {
+          setError("Received an invalid format for tasks.");
+          setTasks([]);
+        }
       }
-    };
+    } catch (err) {
+      setError("An unexpected error occurred.");
+      setTasks([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchTasks();
   }, []);
 
@@ -200,7 +202,6 @@ const KanbanBoard = () => {
     
     const sourceTasks = Array.from(columns[sourceCol]);
     const destTasks = Array.from(columns[destCol]);
-    
     const [removed] = sourceTasks.splice(source.index, 1);
     
     if (sourceCol === destCol) {
@@ -214,8 +215,8 @@ const KanbanBoard = () => {
         [sourceCol]: sourceTasks,
         [destCol]: destTasks,
       });
-      
-      // Map KanbanTask to backend task object
+
+      // Prepare backend task object
       const backendTask = {
         id: removed.id,
         title: removed.title,
@@ -230,32 +231,28 @@ const KanbanBoard = () => {
               profile_picture: removed.assignee.avatar,
             }
           : undefined,
-        // Comments and attachments are usually not updated here
       };
-      
-      // Ensure we have a valid task ID
+
       const taskId = parseInt(removed.id, 10);
-      
-      if (isNaN(taskId)) {
+
+      if (isNaN(taskId) || ['user', 'todo', 'in_progress', 'in_review', 'completed'].includes(removed.id)) {
         toast({ title: "Error", description: "Invalid task ID", variant: "destructive" });
+        fetchTasks(); // Refresh board to revert
         return;
       }
-      
-      // Additional safety check - ensure we're not accidentally passing a droppable ID
-      if (removed.id === 'user' || removed.id === 'todo' || removed.id === 'in_progress' || removed.id === 'in_review' || removed.id === 'completed') {
-        toast({ title: "Error", description: "Invalid task ID - appears to be a column ID", variant: "destructive" });
-        return;
-      }
-      
+
       try {
         const response = await updateTask(taskId, backendTask);
         if (response.error) {
           toast({ title: "Error", description: response.error?.message || String(response.error), variant: "destructive" });
+          fetchTasks(); // Refresh board to revert
         } else {
           toast({ title: "Task updated", description: `Task moved to ${columnNames[destCol]}` });
+          fetchTasks(); // Refresh board to show backend state
         }
       } catch (err) {
         toast({ title: "Error", description: "Failed to update task status", variant: "destructive" });
+        fetchTasks(); // Refresh board to revert
       }
     }
   };
