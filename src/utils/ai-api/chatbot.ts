@@ -55,8 +55,14 @@ export const send_message = async ({ userId, query, context }) => {
         "error": null
         }
     */
+    const token = localStorage.getItem("teamsync_jwt");
+
     try {
-        const res = await axios.post(`${AI_API_BASE_URL}/chatbot/${userId}`, { query, context });
+        const res = await axios.post(`${AI_API_BASE_URL}/chatbot/${userId}`, { query, context }, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
 
         if (res.status === 200) {
             return res.data;

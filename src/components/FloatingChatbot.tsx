@@ -32,16 +32,26 @@ const FloatingChatbot: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [contexts, setContexts] = useState<string[]>([]);
+  const [selectedContext, setSelectedContext] = useState<string | undefined>(undefined);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Fetch user data on component mount
   useEffect(() => {
     const fetchUser = async () => {
+      // Try to get user from localStorage first
+      const storedUser = localStorage.getItem("teamsync_user");
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+        return;
+      }
+      // Fallback to API if not found
       try {
         const userData = await getMe();
         if (!userData.error) {
           setUser(userData);
+          localStorage.setItem("teamsync_user", JSON.stringify(userData));
         }
       } catch (error) {
         console.error('Failed to fetch user:', error);
@@ -49,6 +59,24 @@ const FloatingChatbot: React.FC = () => {
     };
 
     fetchUser();
+  }, []);
+
+  // Fetch available contexts on mount
+  useEffect(() => {
+    const fetchContexts = async () => {
+      try {
+        const ctx = await import('../utils/ai-api-helpers');
+        const result = await ctx.get_context();
+        if (Array.isArray(result)) {
+          setContexts(result);
+        } else if (result && Array.isArray(result.data)) {
+          setContexts(result.data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch contexts:', error);
+      }
+    };
+    fetchContexts();
   }, []);
 
   // Load chat history when chatbot opens
@@ -99,7 +127,7 @@ const FloatingChatbot: React.FC = () => {
       const response = await send_message({
         userId: user.id,
         query: inputMessage,
-        context: undefined, // You can add context selection later
+        context: selectedContext || undefined,
       });
 
       if (!response.error) {
@@ -308,28 +336,43 @@ const FloatingChatbot: React.FC = () => {
 
             {/* Input Area */}
             <div className="p-4 border-t bg-white">
-              <div className="flex space-x-2">
-                <Input
-                  ref={inputRef}
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Type your message..."
-                  disabled={isLoading}
-                  className="flex-1"
-                />
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={isLoading || !inputMessage.trim()}
-                  size="icon"
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                </Button>
+              <div className="flex flex-col gap-2">
+                {/* Context Dropdown */}
+                {contexts.length > 0 && (
+                  <select
+                    className="mb-2 border rounded px-2 py-1 text-sm"
+                    value={selectedContext || ''}
+                    onChange={e => setSelectedContext(e.target.value || undefined)}
+                  >
+                    <option value="">No context (regular chat)</option>
+                    {contexts.map(ctx => (
+                      <option key={ctx} value={ctx}>{ctx}</option>
+                    ))}
+                  </select>
+                )}
+                <div className="flex space-x-2">
+                  <Input
+                    ref={inputRef}
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Type your message..."
+                    disabled={isLoading}
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={handleSendMessage}
+                    disabled={isLoading || !inputMessage.trim()}
+                    size="icon"
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
               </div>
             </div>
           </CardContent>
