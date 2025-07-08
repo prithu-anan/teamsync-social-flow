@@ -9,7 +9,10 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { getTasks } from "@/utils/api-helpers";
+import { getUserTasks } from "@/utils/api/tasks-api";
+import { getProjects, getProjectTasks } from "@/utils/api/projects-api";
+import { getUserById } from "@/utils/api/users-api";
+import { getEvents } from "@/utils/api/events-api";
 
 interface Task {
   id: string;
@@ -43,53 +46,6 @@ interface Event {
   date: string;
   type: "meeting" | "deadline" | "event";
 }
-
-const mockTasks: Task[] = [
-  {
-    id: "1",
-    title: "Design new dashboard layout",
-    status: "in-progress",
-    priority: "high",
-    assignee: {
-      name: "John Doe",
-      avatar: "https://ui-avatars.com/api/?name=John+Doe&background=0D8ABC&color=fff",
-    },
-    dueDate: "2025-05-15",
-  },
-  {
-    id: "2",
-    title: "Fix sidebar responsiveness issue",
-    status: "todo",
-    priority: "medium",
-    assignee: {
-      name: "Jane Smith",
-      avatar: "https://ui-avatars.com/api/?name=Jane+Smith&background=0D9488&color=fff",
-    },
-    dueDate: "2025-05-18",
-  },
-  {
-    id: "3",
-    title: "Update API documentation",
-    status: "done",
-    priority: "low",
-    assignee: {
-      name: "John Doe",
-      avatar: "https://ui-avatars.com/api/?name=John+Doe&background=0D8ABC&color=fff",
-    },
-    dueDate: "2025-05-10",
-  },
-  {
-    id: "4",
-    title: "Prepare quarterly report",
-    status: "todo",
-    priority: "high",
-    assignee: {
-      name: "Jane Smith",
-      avatar: "https://ui-avatars.com/api/?name=Jane+Smith&background=0D9488&color=fff",
-    },
-    dueDate: "2025-05-25",
-  },
-];
 
 const mockProjects: Project[] = [
   {
@@ -148,53 +104,55 @@ const Dashboard = () => {
   const [activeTasks, setActiveTasks] = useState<Task[]>([]);
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
-  const [projects, setProjects] = useState<Project[]>(mockProjects);
-  const [events, setEvents] = useState<Event[]>(mockEvents);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
 
   useEffect(() => {
     // Animation effect for progress bars
-    setTimeout(() => {
+    const timeout = setTimeout(() => {
       setProgress(75);
     }, 100);
+    return () => clearTimeout(timeout);
   }, []);
 
   useEffect(() => {
     const fetchAndProcessTasks = async () => {
       setLoadingTasks(true);
+      if (!user?.id) {
+        setActiveTasks([]);
+        setCompletedTasks([]);
+        setLoadingTasks(false);
+        return;
+      }
       try {
-        const response = await getTasks();
+        const response = await getUserTasks(user.id);
         if (response && !response.error) {
           const tasksData = response.tasks || response.data || response;
           if (Array.isArray(tasksData)) {
             const allTasks = tasksData.map(task => ({
               id: task.id.toString(),
               title: task.title,
-              status: task.status?.toLowerCase().replace('_', '-') || 'todo',
-              priority: task.priority || "low",
+              status: (task.status?.toLowerCase().replace(/_/g, '-') || 'todo') as Task["status"],
+              priority: (task.priority?.toLowerCase() || "low") as Task["priority"],
               assignee: {
-                name: task.assignedTo?.name || "Unknown",
-                avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assignedTo?.name || "U")}`,
+                name: task.assignee?.name || "Unknown",
+                avatar: task.assignee?.profile_picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assignee?.name || "U")}`,
               },
-              dueDate: task.deadline || new Date().toISOString(), // fallback to today if null
+              dueDate: task.due_date || new Date().toISOString(),
             }));
-
-            const active = allTasks.filter(t => t.status === 'todo' || t.status === 'in-progress' || t.status === 'in-review');
-            const completed = allTasks.filter(t => t.status === 'completed');
-
+            const active = allTasks.filter(t => t.status === 'todo' || t.status === 'in-progress');
+            const completed = allTasks.filter(t => t.status === 'done');
             setActiveTasks(active);
             setCompletedTasks(completed);
           } else {
-            console.log("Tasks data is not an array:", tasksData);
             setActiveTasks([]);
             setCompletedTasks([]);
           }
         } else {
-          console.error(response.error);
           setActiveTasks([]);
           setCompletedTasks([]);
         }
       } catch (err) {
-        console.error(err);
         setActiveTasks([]);
         setCompletedTasks([]);
       } finally {
@@ -203,6 +161,106 @@ const Dashboard = () => {
     };
 
     fetchAndProcessTasks();
+  }, [user]);
+
+  // Fetch projects where user is a member
+  useEffect(() => {
+    const fetchProjects = async () => {
+      if (!user?.id) {
+        setProjects([]);
+        return;
+      }
+      try {
+        const response = await getProjects();
+        if (response && !response.error) {
+          const projectsData = response.projects || response.data || response;
+          if (Array.isArray(projectsData)) {
+            // Only include projects where user is a member
+            let userProjects = projectsData.filter(project =>
+              Array.isArray(project.members) && project.members.some(m => m.user_id?.toString() === user.id?.toString())
+            );
+
+            // Fetch user details for all unique member user_ids
+            const allMemberIds = Array.from(new Set(userProjects.flatMap(p => (Array.isArray(p.members) ? p.members.map(m => m.user_id) : []))));
+            const userCache = {};
+            await Promise.all(allMemberIds.map(async (uid) => {
+              if (!uid) return;
+              try {
+                const userRes = await getUserById(uid);
+                if (userRes && userRes.data) {
+                  userCache[uid] = userRes.data;
+                }
+              } catch {}
+            }));
+
+            // Map projects to include team with correct name/avatar
+            userProjects = await Promise.all(userProjects.map(async (project) => {
+              // Fetch tasks for each project
+              let total = 0, completed = 0, progress = 0;
+              try {
+                const taskRes = await getProjectTasks(project.id);
+                const tasksArr = taskRes.tasks || taskRes.data || [];
+                if (Array.isArray(tasksArr)) {
+                  total = tasksArr.length;
+                  completed = tasksArr.filter(t => (t.status?.toLowerCase() === 'done' || t.status?.toLowerCase() === 'completed')).length;
+                  progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+                }
+              } catch {}
+              // Map team
+              const team = Array.isArray(project.members) ? project.members.map(m => {
+                const u = userCache[m.user_id];
+                return {
+                  name: u?.name || "Member",
+                  avatar: u?.profile_picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(u?.name || "M")}`
+                };
+              }) : [];
+              return {
+                id: project.id.toString(),
+                name: project.title || project.name,
+                progress,
+                tasks: { total, completed },
+                team,
+              };
+            }));
+            setProjects(userProjects);
+          } else {
+            setProjects([]);
+          }
+        } else {
+          setProjects([]);
+        }
+      } catch (err) {
+        setProjects([]);
+      }
+    };
+    fetchProjects();
+  }, [user]);
+
+  // Fetch events
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const response = await getEvents();
+        if (response && !response.error) {
+          const eventsData = response.events || response.data || response;
+          if (Array.isArray(eventsData)) {
+            setEvents(eventsData.map(event => ({
+              id: event.id.toString(),
+              title: event.title,
+              date: event.date || event.start_time || event.datetime,
+              type: event.type || 'event',
+            })));
+          } else {
+            setEvents([]);
+          }
+        } else {
+          setEvents([]);
+        }
+      } catch (err) {
+        setEvents([]);
+      }
+    };
+    fetchEvents();
   }, []);
 
   const formatDate = (dateString: string) => {
@@ -263,7 +321,7 @@ const Dashboard = () => {
             <p className="text-xs text-muted-foreground">
               {completedTasks.length} completed
             </p>
-            <Progress className="mt-2" value={progress} />
+            <Progress className="mt-2" value={(activeTasks.length + completedTasks.length) > 0 ? (completedTasks.length / (activeTasks.length + completedTasks.length)) * 100 : 0} />
           </CardContent>
         </Card>
         <Card className="backdrop-blur-sm bg-card/50 border-border/50">
@@ -272,16 +330,17 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{projects.length}</div>
-            <p className="text-xs text-muted-foreground">2 in progress</p>
+            <p className="text-xs text-muted-foreground">{projects.length} in progress</p>
             <div className="mt-2 flex -space-x-2 overflow-hidden">
               {projects.flatMap((p) => p.team).slice(0, 4).map((member, i) => (
                 <Avatar key={i} className="border-2 border-background h-8 w-8">
-                  <AvatarImage src={member.avatar} alt={member.name} />
+                  {member.avatar ? (
+                    <AvatarImage src={member.avatar} alt={member.name || 'M'} />
+                  ) : null}
                   <AvatarFallback>
                     {member.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")}
+                      ? member.name.split(" ").map((n) => n[0]).join("")
+                      : "M"}
                   </AvatarFallback>
                 </Avatar>
               ))}
@@ -313,9 +372,11 @@ const Dashboard = () => {
             <CardTitle className="text-sm font-medium">Team Members</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">8</div>
+            <div className="text-2xl font-bold">{
+              Array.from(new Set(projects.flatMap(p => (p.team && Array.isArray(p.team) ? p.team.map(m => m.name) : [])))).length
+            }</div>
             <p className="text-xs text-muted-foreground">
-              across 3 departments
+              across {projects.length} departments
             </p>
             <div className="mt-2 flex items-center">
               <Users className="h-4 w-4 mr-2 text-teamsync-500" />
@@ -331,12 +392,6 @@ const Dashboard = () => {
         <Card className="col-span-1 lg:col-span-2 backdrop-blur-sm bg-card/50 border-border/50">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>My Tasks</CardTitle>
-            <Button asChild variant="outline" size="sm">
-              <Link to="/kanban">
-                View all
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Link>
-            </Button>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="active">
@@ -440,6 +495,13 @@ const Dashboard = () => {
               </TabsContent>
             </Tabs>
           </CardContent>
+          <CardFooter>
+            <Button asChild variant="outline" className="w-full">
+              <Link to="/kanban">
+                View all <ArrowRight className="h-4 w-4 ml-2" />
+              </Link>
+            </Button>
+          </CardFooter>
         </Card>
 
         {/* Events section */}
@@ -449,7 +511,7 @@ const Dashboard = () => {
             <CardDescription>Schedule for the next 30 days</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {events.map((event) => (
+            {events.slice(0, 3).map((event) => (
               <div key={event.id} className="flex items-start space-x-4">
                 <div className="bg-muted p-2 rounded-md">
                   {event.type === "meeting" ? (
@@ -507,12 +569,13 @@ const Dashboard = () => {
                   <div className="flex -space-x-2 overflow-hidden">
                     {project.team.map((member, i) => (
                       <Avatar key={i} className="border-2 border-background">
-                        <AvatarImage src={member.avatar} alt={member.name} />
+                        {member.avatar ? (
+                          <AvatarImage src={member.avatar} alt={member.name || 'M'} />
+                        ) : null}
                         <AvatarFallback>
                           {member.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
+                            ? member.name.split(" ").map((n) => n[0]).join("")
+                            : "M"}
                         </AvatarFallback>
                       </Avatar>
                     ))}
