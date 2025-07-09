@@ -39,8 +39,9 @@ test('User can send a message to the chatbot and receive a response containing t
   // 4. Type and send a specific message
   const testMessage = 'who am i';
   await page.fill(chatbotInput, testMessage);
-  await page.click('button:has(svg)'); // Click send
+  // Click the send button specifically within the chatbot input area
+  await page.click('div.p-4.border-t.bg-white button:has(svg)'); // Click send button in input area
 
-  // 5. Wait for an AI message containing 'sadat' (case-insensitive)
+  // 5. Wait for an AI message containing 'sadat' (case-insensitive) - multiple occurrences are allowed
   await expect(page.locator('.chatbot-prose')).toContainText(/sadat/i, { timeout: 15000 });
 }); 
