@@ -125,10 +125,7 @@ const CalendarViews = () => {
       // Handle empty array case - send null or empty array based on backend preference
       participant_ids: newEvent.participants.length > 0 ? newEvent.participants.map(Number) : [],
     };
-    console.log('Submitting eventData:', eventData);
-    console.log('participant_ids type:', typeof eventData.participant_ids, 'value:', eventData.participant_ids);
     const res = await createEvent(eventData);
-    console.log('API response:', res);
     if (!res.error) {
       setAddEventOpen(false);
       setNewEvent({ title: '', description: '', date: '', type: 'meeting', participants: [] });
