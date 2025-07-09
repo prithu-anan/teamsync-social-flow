@@ -141,7 +141,13 @@ const MessageItem = ({
         {/* Avatar */}
         {!isOwnMessage && (
           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <img src={message.userAvatar} alt={message.userName} className="w-full h-full rounded-full object-cover" />
+            {message.userAvatar && message.userAvatar !== '/placeholder.svg' ? (
+              <img src={message.userAvatar} alt={message.userName} className="w-full h-full rounded-full object-cover" />
+            ) : (
+              <span className="text-lg font-bold text-primary">
+                {message.userName ? message.userName.charAt(0).toUpperCase() : '?'}
+              </span>
+            )}
           </div>
         )}
         {/* Message Content */}
@@ -273,7 +279,13 @@ const MessageItem = ({
         {/* Avatar for own message (optional, can be omitted for classic chat look) */}
         {isOwnMessage && (
           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <img src={message.userAvatar} alt={message.userName} className="w-full h-full rounded-full object-cover" />
+            {message.userAvatar && message.userAvatar !== '/placeholder.svg' ? (
+              <img src={message.userAvatar} alt={message.userName} className="w-full h-full rounded-full object-cover" />
+            ) : (
+              <span className="text-lg font-bold text-primary">
+                {message.userName ? message.userName.charAt(0).toUpperCase() : '?'}
+              </span>
+            )}
           </div>
         )}
         {/* Message Actions for left-aligned messages */}

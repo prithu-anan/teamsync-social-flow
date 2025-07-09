@@ -113,11 +113,18 @@ const ChannelInfoSidebar = ({ channel }) => {
                   key={idx}
                   className="flex items-center gap-3 p-2 rounded-lg transition-colors cursor-pointer hover:bg-blue-100/60 dark:hover:bg-slate-800/40 group"
                 >
-                  <img
-                    src={member.avatar || '/placeholder.svg'}
-                    alt={member.name}
-                    className="w-8 h-8 rounded-full object-cover border border-border bg-white"
-                  />
+                  {/* Avatar with fallback */}
+                  {member.avatar ? (
+                    <img
+                      src={member.avatar}
+                      alt={member.name}
+                      className="w-8 h-8 rounded-full object-cover border border-border bg-white"
+                    />
+                  ) : (
+                    <span className="w-8 h-8 rounded-full flex items-center justify-center bg-primary/10 text-lg font-bold text-primary border border-border">
+                      {member.name ? member.name.charAt(0).toUpperCase() : '?'}
+                    </span>
+                  )}
                   <span className="text-base font-semibold text-gray-800 dark:text-gray-100 group-hover:text-blue-700 dark:group-hover:text-blue-300 truncate">
                     {member.name}
                   </span>

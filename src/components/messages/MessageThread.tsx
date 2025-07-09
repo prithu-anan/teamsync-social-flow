@@ -240,29 +240,32 @@ const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMes
       {/* Messages Area - Scrollable */}
       <ScrollArea className="flex-1 min-h-0">
         <div className="p-6 space-y-6">
-          {channelMessages.map((message) => (
-            <div key={message.id}>
-              {/* If this message is a reply, show the replied-to message above it */}
-              {message.thread_parent_id && (
-                <div className="mb-1 ml-4 pl-2 border-l-2 border-muted-foreground/30 text-xs text-muted-foreground">
-                  {(() => {
-                    const repliedMsg = messages.find(m => m.id === message.thread_parent_id);
-                    return repliedMsg ? <span><span className="font-semibold">{repliedMsg.userName}:</span> {repliedMsg.content}</span> : <span>Replied message not found</span>;
-                  })()}
-                </div>
-              )}
-              <MessageItem
-                message={message}
-                onReply={setReplyingTo}
-                onPin={() => (pinnedMessages.some(m => m.id === message.id) ? onUnpinMessage(message) : onPinMessage(message))}
-                isPinned={pinnedMessages.some(m => m.id === message.id)}
-                onOpenThread={() => setOpenThread({message, channel})}
-                onReact={handleReact}
-                onEdit={handleEditMessage}
-                onDelete={handleDeleteMessage}
-              />
-            </div>
-          ))}
+          {channelMessages.map((message) => {
+            const isOwnMessage = user?.id && message.sender_id && String(user.id) === String(message.sender_id);
+            return (
+              <div key={message.id} className={`flex flex-col ${isOwnMessage ? 'items-end' : 'items-start'}`}>
+                {/* If this message is a reply, show the replied-to message above it as a block, aligned with the message */}
+                {message.thread_parent_id && (() => {
+                  const repliedMsg = messages.find(m => m.id === message.thread_parent_id);
+                  return repliedMsg ? (
+                    <div className="mb-1 max-w-xl px-4 py-2 rounded-xl bg-muted/40 text-xs text-muted-foreground border border-border">
+                      <span className="font-semibold">{repliedMsg.userName}:</span> {repliedMsg.content}
+                    </div>
+                  ) : null;
+                })()}
+                <MessageItem
+                  message={message}
+                  onReply={setReplyingTo}
+                  onPin={() => (pinnedMessages.some(m => m.id === message.id) ? onUnpinMessage(message) : onPinMessage(message))}
+                  isPinned={pinnedMessages.some(m => m.id === message.id)}
+                  onOpenThread={() => setOpenThread({message, channel})}
+                  onReact={handleReact}
+                  onEdit={handleEditMessage}
+                  onDelete={handleDeleteMessage}
+                />
+              </div>
+            );
+          })}
           <div ref={messagesEndRef} />
         </div>
       </ScrollArea>
