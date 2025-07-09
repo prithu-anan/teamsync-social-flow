@@ -28,10 +28,11 @@ test('User can send a message to the chatbot and receive a response containing t
 
   // 3. Optionally select a context if dropdown is present
   if (await page.locator(contextDropdown).isVisible()) {
-    // Select the first context (if not "No context")
+    // Robustly select any option whose label includes 'no context' (case-insensitive)
     const options = await page.locator(contextDropdown + ' option').allTextContents();
-    if (options.length > 1) {
-      await page.selectOption(contextDropdown, { index: 1 });
+    const noContextOption = options.find(opt => opt.toLowerCase().includes('no context'));
+    if (noContextOption) {
+      await page.selectOption(contextDropdown, { label: noContextOption });
     }
   }
 
