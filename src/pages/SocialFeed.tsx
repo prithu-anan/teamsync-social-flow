@@ -104,6 +104,7 @@ const SocialFeed = () => {
   const [reactionPopoverOpen, setReactionPopoverOpen] = useState<Record<string, boolean>>({});
   const [userCommentReactions, setUserCommentReactions] = useState<Record<string, string | null>>({});
   const [commentReactionPopoverOpen, setCommentReactionPopoverOpen] = useState<Record<string, boolean>>({});
+  const [commentsVisible, setCommentsVisible] = useState<Record<string, boolean>>({});
 
   // Load posts on component mount
   useEffect(() => {
@@ -431,7 +432,18 @@ const SocialFeed = () => {
   // Filter posts based on active tab
   const getFilteredPosts = () => {
     if (activeTab === "all") return posts;
-    return posts.filter((post) => post.type === activeTab);
+    
+    // Map tab values to post types
+    const tabToTypeMap: Record<string, string> = {
+      "events": "event",
+      "birthdays": "birthday", 
+      "appreciation": "appreciation"
+    };
+    
+    const postType = tabToTypeMap[activeTab];
+    if (!postType) return posts;
+    
+    return posts.filter((post) => post.type === postType);
   };
 
   // Handler to add a reaction
@@ -589,6 +601,11 @@ const SocialFeed = () => {
     setCommentReactionPopoverOpen(prev => ({ ...prev, [`${postId}_${commentId}`]: open }));
   };
 
+  // Toggle comments visibility for a post
+  const toggleComments = (postId: string) => {
+    setCommentsVisible(prev => ({ ...prev, [postId]: !prev[postId] }));
+  };
+
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto flex items-center justify-center min-h-[400px]">
@@ -617,7 +634,7 @@ const SocialFeed = () => {
           <TabsTrigger value="all">All</TabsTrigger>
           <TabsTrigger value="events">Events</TabsTrigger>
           <TabsTrigger value="birthdays">Birthdays</TabsTrigger>
-          <TabsTrigger value="achievements">Achievements</TabsTrigger>
+          <TabsTrigger value="appreciation">Appreciation</TabsTrigger>
         </TabsList>
         <TabsContent value="all">
           {/* Create post */}
@@ -803,9 +820,14 @@ const SocialFeed = () => {
                         ))}
                       </PopoverContent>
                     </Popover>
-                    <Button variant="ghost" size="sm" className="flex-1 flex items-center justify-center px-0 py-2 rounded-none font-medium transition hover:bg-muted/50">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="flex-1 flex items-center justify-center px-0 py-2 rounded-none font-medium transition hover:bg-muted/50"
+                      onClick={() => toggleComments(post.id)}
+                    >
                       <MessageCircle className="h-4 w-4 mr-1" />
-                      Comment
+                      {commentsVisible[post.id] ? 'Hide Comments' : 'Comment'}
                     </Button>
                     <Button variant="ghost" size="sm" className="flex-1 flex items-center justify-center px-0 py-2 rounded-none font-medium transition hover:bg-muted/50">
                       <Share2 className="h-4 w-4 mr-1" />
@@ -830,94 +852,37 @@ const SocialFeed = () => {
                   </div>
                   
                   {/* Comments */}
-                  <div className="w-full mt-4 space-y-3 px-4">
-                    {post.comments.map((comment) => (
-                      <div key={comment.id} className="flex gap-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={comment.author.avatar} alt={comment.author.name} />
-                          <AvatarFallback>
-                            {comment.author.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <div className="bg-muted/50 backdrop-blur-sm p-3 rounded-lg inline-block max-w-xs min-w-0 break-words">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold">{comment.author.name}</span>
-                              <span className="text-xs text-muted-foreground">{formatDate(comment.timestamp)}</span>
+                  {commentsVisible[post.id] && (
+                    <div className="w-full mt-4 space-y-3 px-4">
+                      {post.comments.map((comment) => (
+                        <div key={comment.id} className="flex gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={comment.author.avatar} alt={comment.author.name} />
+                            <AvatarFallback>
+                              {comment.author.name
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <div className="bg-muted/50 backdrop-blur-sm p-3 rounded-lg inline-block max-w-xs min-w-0 break-words">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">{comment.author.name}</span>
+                                <span className="text-xs text-muted-foreground">{formatDate(comment.timestamp)}</span>
+                              </div>
+                              <p className="text-sm">{comment.content}</p>
                             </div>
-                            <p className="text-sm">{comment.content}</p>
-                          </div>
-                          <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
-                            <Popover open={!!commentReactionPopoverOpen[`${post.id}_${comment.id}`]} onOpenChange={open => handleCommentReactionPopoverOpen(post.id, comment.id, open)}>
-                              <PopoverTrigger asChild>
-                                <span
-                                  className={`inline-flex items-center cursor-pointer select-none ${userCommentReactions[`${post.id}_${comment.id}`] ? 'text-primary' : ''}`}
-                                  onClick={async () => {
-                                    const key = `${post.id}_${comment.id}`;
-                                    if (!userCommentReactions[key]) {
-                                      await handleAddCommentReaction(post.id, comment.id, 'like');
-                                    } else if (userCommentReactions[key] !== 'like') {
-                                      await feedApi.removeReactionFromCommentWithQuery(Number(post.id), Number(comment.id), user.id, userCommentReactions[key]!);
-                                      // Update state to remove old reaction
-                                      setPosts(prevPosts => prevPosts.map(p => {
-                                        if (String(p.id) !== String(post.id)) return p;
-                                        return {
-                                          ...p,
-                                          comments: p.comments.map(c => {
-                                            if (String(c.id) !== String(comment.id)) return c;
-                                            const newReactions = (c.reactions || []).filter(r => r.reactionType !== userCommentReactions[key] || Number(r.userId) !== Number(user.id));
-                                            return { ...c, reactions: newReactions };
-                                          })
-                                        };
-                                      }));
-                                      setUserCommentReactions(prev => ({ ...prev, [key]: null }));
-                                      // Add Like reaction and update state
-                                      await handleAddCommentReaction(post.id, comment.id, 'like');
-                                    } else {
-                                      // Unselect: remove reaction and update state
-                                      await feedApi.removeReactionFromCommentWithQuery(Number(post.id), Number(comment.id), user.id, userCommentReactions[key]!);
-                                      setPosts(prevPosts => prevPosts.map(p => {
-                                        if (String(p.id) !== String(post.id)) return p;
-                                        return {
-                                          ...p,
-                                          comments: p.comments.map(c => {
-                                            if (String(c.id) !== String(comment.id)) return c;
-                                            const newReactions = (c.reactions || []).filter(r => r.reactionType !== userCommentReactions[key] || Number(r.userId) !== Number(user.id));
-                                            return { ...c, reactions: newReactions };
-                                          })
-                                        };
-                                      }));
-                                      setUserCommentReactions(prev => ({ ...prev, [key]: null }));
-                                    }
-                                  }}
-                                  onMouseEnter={() => handleCommentReactionPopoverOpen(post.id, comment.id, true)}
-                                  onMouseLeave={() => handleCommentReactionPopoverOpen(post.id, comment.id, false)}
-                                  role="button"
-                                  tabIndex={0}
-                                >
-                                  <span className="text-xl mr-1">{REACTION_EMOJIS['like']}</span>
-                                  <span>{REACTION_NAMES['like']}</span>
-                                </span>
-                              </PopoverTrigger>
-                              <PopoverContent
-                                side="top"
-                                align="center"
-                                className="flex gap-2 p-2 w-auto bg-white shadow-lg rounded-full border border-gray-200"
-                                onMouseEnter={() => handleCommentReactionPopoverOpen(post.id, comment.id, true)}
-                                onMouseLeave={() => handleCommentReactionPopoverOpen(post.id, comment.id, false)}
-                              >
-                                {REACTION_TYPES.map(type => (
-                                  <button
-                                    key={type}
-                                    className="text-2xl hover:scale-125 transition-transform px-2 py-1 focus:outline-none"
+                            <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
+                              <Popover open={!!commentReactionPopoverOpen[`${post.id}_${comment.id}`]} onOpenChange={open => handleCommentReactionPopoverOpen(post.id, comment.id, open)}>
+                                <PopoverTrigger asChild>
+                                  <span
+                                    className={`inline-flex items-center cursor-pointer select-none ${userCommentReactions[`${post.id}_${comment.id}`] ? 'text-primary' : ''}`}
                                     onClick={async () => {
                                       const key = `${post.id}_${comment.id}`;
                                       if (!userCommentReactions[key]) {
-                                        await handleAddCommentReaction(post.id, comment.id, type);
-                                      } else if (userCommentReactions[key] !== type) {
+                                        await handleAddCommentReaction(post.id, comment.id, 'like');
+                                      } else if (userCommentReactions[key] !== 'like') {
                                         await feedApi.removeReactionFromCommentWithQuery(Number(post.id), Number(comment.id), user.id, userCommentReactions[key]!);
                                         // Update state to remove old reaction
                                         setPosts(prevPosts => prevPosts.map(p => {
@@ -932,23 +897,82 @@ const SocialFeed = () => {
                                           };
                                         }));
                                         setUserCommentReactions(prev => ({ ...prev, [key]: null }));
-                                        // Add new reaction and update state
-                                        await handleAddCommentReaction(post.id, comment.id, type);
+                                        // Add Like reaction and update state
+                                        await handleAddCommentReaction(post.id, comment.id, 'like');
+                                      } else {
+                                        // Unselect: remove reaction and update state
+                                        await feedApi.removeReactionFromCommentWithQuery(Number(post.id), Number(comment.id), user.id, userCommentReactions[key]!);
+                                        setPosts(prevPosts => prevPosts.map(p => {
+                                          if (String(p.id) !== String(post.id)) return p;
+                                          return {
+                                            ...p,
+                                            comments: p.comments.map(c => {
+                                              if (String(c.id) !== String(comment.id)) return c;
+                                              const newReactions = (c.reactions || []).filter(r => r.reactionType !== userCommentReactions[key] || Number(r.userId) !== Number(user.id));
+                                              return { ...c, reactions: newReactions };
+                                            })
+                                          };
+                                        }));
+                                        setUserCommentReactions(prev => ({ ...prev, [key]: null }));
                                       }
                                     }}
-                                    type="button"
+                                    onMouseEnter={() => handleCommentReactionPopoverOpen(post.id, comment.id, true)}
+                                    onMouseLeave={() => handleCommentReactionPopoverOpen(post.id, comment.id, false)}
+                                    role="button"
+                                    tabIndex={0}
                                   >
-                                    {REACTION_EMOJIS[type]}
-                                  </button>
-                                ))}
-                              </PopoverContent>
-                            </Popover>
-                            <button className="hover:text-foreground">Reply</button>
+                                    <span className="text-xl mr-1">{REACTION_EMOJIS['like']}</span>
+                                    <span>{REACTION_NAMES['like']}</span>
+                                  </span>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                  side="top"
+                                  align="center"
+                                  className="flex gap-2 p-2 w-auto bg-white shadow-lg rounded-full border border-gray-200"
+                                  onMouseEnter={() => handleCommentReactionPopoverOpen(post.id, comment.id, true)}
+                                  onMouseLeave={() => handleCommentReactionPopoverOpen(post.id, comment.id, false)}
+                                >
+                                  {REACTION_TYPES.map(type => (
+                                    <button
+                                      key={type}
+                                      className="text-2xl hover:scale-125 transition-transform px-2 py-1 focus:outline-none"
+                                      onClick={async () => {
+                                        const key = `${post.id}_${comment.id}`;
+                                        if (!userCommentReactions[key]) {
+                                          await handleAddCommentReaction(post.id, comment.id, type);
+                                        } else if (userCommentReactions[key] !== type) {
+                                          await feedApi.removeReactionFromCommentWithQuery(Number(post.id), Number(comment.id), user.id, userCommentReactions[key]!);
+                                          // Update state to remove old reaction
+                                          setPosts(prevPosts => prevPosts.map(p => {
+                                            if (String(p.id) !== String(post.id)) return p;
+                                            return {
+                                              ...p,
+                                              comments: p.comments.map(c => {
+                                                if (String(c.id) !== String(comment.id)) return c;
+                                                const newReactions = (c.reactions || []).filter(r => r.reactionType !== userCommentReactions[key] || Number(r.userId) !== Number(user.id));
+                                                return { ...c, reactions: newReactions };
+                                              })
+                                            };
+                                          }));
+                                          setUserCommentReactions(prev => ({ ...prev, [key]: null }));
+                                          // Add new reaction and update state
+                                          await handleAddCommentReaction(post.id, comment.id, type);
+                                        }
+                                      }}
+                                      type="button"
+                                    >
+                                      {REACTION_EMOJIS[type]}
+                                    </button>
+                                  ))}
+                                </PopoverContent>
+                              </Popover>
+                              <button className="hover:text-foreground">Reply</button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                   
                   {/* Add comment */}
                   <div className="flex gap-3 w-full mt-4 px-4 pb-2">
@@ -1101,9 +1125,14 @@ const SocialFeed = () => {
                         ))}
                       </PopoverContent>
                     </Popover>
-                    <Button variant="ghost" size="sm" className="flex-1 flex items-center justify-center px-0 py-2 rounded-none font-medium transition hover:bg-muted/50">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="flex-1 flex items-center justify-center px-0 py-2 rounded-none font-medium transition hover:bg-muted/50"
+                      onClick={() => toggleComments(post.id)}
+                    >
                       <MessageCircle className="h-4 w-4 mr-1" />
-                      Comment
+                      {commentsVisible[post.id] ? 'Hide Comments' : 'Comment'}
                     </Button>
                     <Button variant="ghost" size="sm" className="flex-1 flex items-center justify-center px-0 py-2 rounded-none font-medium transition hover:bg-muted/50">
                       <Share2 className="h-4 w-4 mr-1" />
@@ -1128,94 +1157,37 @@ const SocialFeed = () => {
                   </div>
                   
                   {/* Comments */}
-                  <div className="w-full mt-4 space-y-3 px-4">
-                    {post.comments.map((comment) => (
-                      <div key={comment.id} className="flex gap-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={comment.author.avatar} alt={comment.author.name} />
-                          <AvatarFallback>
-                            {comment.author.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <div className="bg-muted/50 backdrop-blur-sm p-3 rounded-lg inline-block max-w-xs min-w-0 break-words">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold">{comment.author.name}</span>
-                              <span className="text-xs text-muted-foreground">{formatDate(comment.timestamp)}</span>
+                  {commentsVisible[post.id] && (
+                    <div className="w-full mt-4 space-y-3 px-4">
+                      {post.comments.map((comment) => (
+                        <div key={comment.id} className="flex gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={comment.author.avatar} alt={comment.author.name} />
+                            <AvatarFallback>
+                              {comment.author.name
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <div className="bg-muted/50 backdrop-blur-sm p-3 rounded-lg inline-block max-w-xs min-w-0 break-words">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">{comment.author.name}</span>
+                                <span className="text-xs text-muted-foreground">{formatDate(comment.timestamp)}</span>
+                              </div>
+                              <p className="text-sm">{comment.content}</p>
                             </div>
-                            <p className="text-sm">{comment.content}</p>
-                          </div>
-                          <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
-                            <Popover open={!!commentReactionPopoverOpen[`${post.id}_${comment.id}`]} onOpenChange={open => handleCommentReactionPopoverOpen(post.id, comment.id, open)}>
-                              <PopoverTrigger asChild>
-                                <span
-                                  className={`inline-flex items-center cursor-pointer select-none ${userCommentReactions[`${post.id}_${comment.id}`] ? 'text-primary' : ''}`}
-                                  onClick={async () => {
-                                    const key = `${post.id}_${comment.id}`;
-                                    if (!userCommentReactions[key]) {
-                                      await handleAddCommentReaction(post.id, comment.id, 'like');
-                                    } else if (userCommentReactions[key] !== 'like') {
-                                      await feedApi.removeReactionFromCommentWithQuery(Number(post.id), Number(comment.id), user.id, userCommentReactions[key]!);
-                                      // Update state to remove old reaction
-                                      setPosts(prevPosts => prevPosts.map(p => {
-                                        if (String(p.id) !== String(post.id)) return p;
-                                        return {
-                                          ...p,
-                                          comments: p.comments.map(c => {
-                                            if (String(c.id) !== String(comment.id)) return c;
-                                            const newReactions = (c.reactions || []).filter(r => r.reactionType !== userCommentReactions[key] || Number(r.userId) !== Number(user.id));
-                                            return { ...c, reactions: newReactions };
-                                          })
-                                        };
-                                      }));
-                                      setUserCommentReactions(prev => ({ ...prev, [key]: null }));
-                                      // Add Like reaction and update state
-                                      await handleAddCommentReaction(post.id, comment.id, 'like');
-                                    } else {
-                                      // Unselect: remove reaction and update state
-                                      await feedApi.removeReactionFromCommentWithQuery(Number(post.id), Number(comment.id), user.id, userCommentReactions[key]!);
-                                      setPosts(prevPosts => prevPosts.map(p => {
-                                        if (String(p.id) !== String(post.id)) return p;
-                                        return {
-                                          ...p,
-                                          comments: p.comments.map(c => {
-                                            if (String(c.id) !== String(comment.id)) return c;
-                                            const newReactions = (c.reactions || []).filter(r => r.reactionType !== userCommentReactions[key] || Number(r.userId) !== Number(user.id));
-                                            return { ...c, reactions: newReactions };
-                                          })
-                                        };
-                                      }));
-                                      setUserCommentReactions(prev => ({ ...prev, [key]: null }));
-                                    }
-                                  }}
-                                  onMouseEnter={() => handleCommentReactionPopoverOpen(post.id, comment.id, true)}
-                                  onMouseLeave={() => handleCommentReactionPopoverOpen(post.id, comment.id, false)}
-                                  role="button"
-                                  tabIndex={0}
-                                >
-                                  <span className="text-xl mr-1">{REACTION_EMOJIS['like']}</span>
-                                  <span>{REACTION_NAMES['like']}</span>
-                                </span>
-                              </PopoverTrigger>
-                              <PopoverContent
-                                side="top"
-                                align="center"
-                                className="flex gap-2 p-2 w-auto bg-white shadow-lg rounded-full border border-gray-200"
-                                onMouseEnter={() => handleCommentReactionPopoverOpen(post.id, comment.id, true)}
-                                onMouseLeave={() => handleCommentReactionPopoverOpen(post.id, comment.id, false)}
-                              >
-                                {REACTION_TYPES.map(type => (
-                                  <button
-                                    key={type}
-                                    className="text-2xl hover:scale-125 transition-transform px-2 py-1 focus:outline-none"
+                            <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
+                              <Popover open={!!commentReactionPopoverOpen[`${post.id}_${comment.id}`]} onOpenChange={open => handleCommentReactionPopoverOpen(post.id, comment.id, open)}>
+                                <PopoverTrigger asChild>
+                                  <span
+                                    className={`inline-flex items-center cursor-pointer select-none ${userCommentReactions[`${post.id}_${comment.id}`] ? 'text-primary' : ''}`}
                                     onClick={async () => {
                                       const key = `${post.id}_${comment.id}`;
                                       if (!userCommentReactions[key]) {
-                                        await handleAddCommentReaction(post.id, comment.id, type);
-                                      } else if (userCommentReactions[key] !== type) {
+                                        await handleAddCommentReaction(post.id, comment.id, 'like');
+                                      } else if (userCommentReactions[key] !== 'like') {
                                         await feedApi.removeReactionFromCommentWithQuery(Number(post.id), Number(comment.id), user.id, userCommentReactions[key]!);
                                         // Update state to remove old reaction
                                         setPosts(prevPosts => prevPosts.map(p => {
@@ -1230,23 +1202,82 @@ const SocialFeed = () => {
                                           };
                                         }));
                                         setUserCommentReactions(prev => ({ ...prev, [key]: null }));
-                                        // Add new reaction and update state
-                                        await handleAddCommentReaction(post.id, comment.id, type);
+                                        // Add Like reaction and update state
+                                        await handleAddCommentReaction(post.id, comment.id, 'like');
+                                      } else {
+                                        // Unselect: remove reaction and update state
+                                        await feedApi.removeReactionFromCommentWithQuery(Number(post.id), Number(comment.id), user.id, userCommentReactions[key]!);
+                                        setPosts(prevPosts => prevPosts.map(p => {
+                                          if (String(p.id) !== String(post.id)) return p;
+                                          return {
+                                            ...p,
+                                            comments: p.comments.map(c => {
+                                              if (String(c.id) !== String(comment.id)) return c;
+                                              const newReactions = (c.reactions || []).filter(r => r.reactionType !== userCommentReactions[key] || Number(r.userId) !== Number(user.id));
+                                              return { ...c, reactions: newReactions };
+                                            })
+                                          };
+                                        }));
+                                        setUserCommentReactions(prev => ({ ...prev, [key]: null }));
                                       }
                                     }}
-                                    type="button"
+                                    onMouseEnter={() => handleCommentReactionPopoverOpen(post.id, comment.id, true)}
+                                    onMouseLeave={() => handleCommentReactionPopoverOpen(post.id, comment.id, false)}
+                                    role="button"
+                                    tabIndex={0}
                                   >
-                                    {REACTION_EMOJIS[type]}
-                                  </button>
-                                ))}
-                              </PopoverContent>
-                            </Popover>
-                            <button className="hover:text-foreground">Reply</button>
+                                    <span className="text-xl mr-1">{REACTION_EMOJIS['like']}</span>
+                                    <span>{REACTION_NAMES['like']}</span>
+                                  </span>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                  side="top"
+                                  align="center"
+                                  className="flex gap-2 p-2 w-auto bg-white shadow-lg rounded-full border border-gray-200"
+                                  onMouseEnter={() => handleCommentReactionPopoverOpen(post.id, comment.id, true)}
+                                  onMouseLeave={() => handleCommentReactionPopoverOpen(post.id, comment.id, false)}
+                                >
+                                  {REACTION_TYPES.map(type => (
+                                    <button
+                                      key={type}
+                                      className="text-2xl hover:scale-125 transition-transform px-2 py-1 focus:outline-none"
+                                      onClick={async () => {
+                                        const key = `${post.id}_${comment.id}`;
+                                        if (!userCommentReactions[key]) {
+                                          await handleAddCommentReaction(post.id, comment.id, type);
+                                        } else if (userCommentReactions[key] !== type) {
+                                          await feedApi.removeReactionFromCommentWithQuery(Number(post.id), Number(comment.id), user.id, userCommentReactions[key]!);
+                                          // Update state to remove old reaction
+                                          setPosts(prevPosts => prevPosts.map(p => {
+                                            if (String(p.id) !== String(post.id)) return p;
+                                            return {
+                                              ...p,
+                                              comments: p.comments.map(c => {
+                                                if (String(c.id) !== String(comment.id)) return c;
+                                                const newReactions = (c.reactions || []).filter(r => r.reactionType !== userCommentReactions[key] || Number(r.userId) !== Number(user.id));
+                                                return { ...c, reactions: newReactions };
+                                              })
+                                            };
+                                          }));
+                                          setUserCommentReactions(prev => ({ ...prev, [key]: null }));
+                                          // Add new reaction and update state
+                                          await handleAddCommentReaction(post.id, comment.id, type);
+                                        }
+                                      }}
+                                      type="button"
+                                    >
+                                      {REACTION_EMOJIS[type]}
+                                    </button>
+                                  ))}
+                                </PopoverContent>
+                              </Popover>
+                              <button className="hover:text-foreground">Reply</button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                   
                   {/* Add comment */}
                   <div className="flex gap-3 w-full mt-4 px-4 pb-2">
@@ -1380,9 +1411,14 @@ const SocialFeed = () => {
                         ))}
                       </PopoverContent>
                     </Popover>
-                    <Button variant="ghost" size="sm" className="flex-1 flex items-center justify-center px-0 py-2 rounded-none font-medium transition hover:bg-muted/50">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="flex-1 flex items-center justify-center px-0 py-2 rounded-none font-medium transition hover:bg-muted/50"
+                      onClick={() => toggleComments(post.id)}
+                    >
                       <MessageCircle className="h-4 w-4 mr-1" />
-                      Comment
+                      {commentsVisible[post.id] ? 'Hide Comments' : 'Comment'}
                     </Button>
                     <Button variant="ghost" size="sm" className="flex-1 flex items-center justify-center px-0 py-2 rounded-none font-medium transition hover:bg-muted/50">
                       <Share2 className="h-4 w-4 mr-1" />
@@ -1407,94 +1443,37 @@ const SocialFeed = () => {
                   </div>
                   
                   {/* Comments */}
-                  <div className="w-full mt-4 space-y-3 px-4">
-                    {post.comments.map((comment) => (
-                      <div key={comment.id} className="flex gap-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={comment.author.avatar} alt={comment.author.name} />
-                          <AvatarFallback>
-                            {comment.author.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <div className="bg-muted/50 backdrop-blur-sm p-3 rounded-lg inline-block max-w-xs min-w-0 break-words">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold">{comment.author.name}</span>
-                              <span className="text-xs text-muted-foreground">{formatDate(comment.timestamp)}</span>
+                  {commentsVisible[post.id] && (
+                    <div className="w-full mt-4 space-y-3 px-4">
+                      {post.comments.map((comment) => (
+                        <div key={comment.id} className="flex gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={comment.author.avatar} alt={comment.author.name} />
+                            <AvatarFallback>
+                              {comment.author.name
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <div className="bg-muted/50 backdrop-blur-sm p-3 rounded-lg inline-block max-w-xs min-w-0 break-words">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">{comment.author.name}</span>
+                                <span className="text-xs text-muted-foreground">{formatDate(comment.timestamp)}</span>
+                              </div>
+                              <p className="text-sm">{comment.content}</p>
                             </div>
-                            <p className="text-sm">{comment.content}</p>
-                          </div>
-                          <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
-                            <Popover open={!!commentReactionPopoverOpen[`${post.id}_${comment.id}`]} onOpenChange={open => handleCommentReactionPopoverOpen(post.id, comment.id, open)}>
-                              <PopoverTrigger asChild>
-                                <span
-                                  className={`inline-flex items-center cursor-pointer select-none ${userCommentReactions[`${post.id}_${comment.id}`] ? 'text-primary' : ''}`}
-                                  onClick={async () => {
-                                    const key = `${post.id}_${comment.id}`;
-                                    if (!userCommentReactions[key]) {
-                                      await handleAddCommentReaction(post.id, comment.id, 'like');
-                                    } else if (userCommentReactions[key] !== 'like') {
-                                      await feedApi.removeReactionFromCommentWithQuery(Number(post.id), Number(comment.id), user.id, userCommentReactions[key]!);
-                                      // Update state to remove old reaction
-                                      setPosts(prevPosts => prevPosts.map(p => {
-                                        if (String(p.id) !== String(post.id)) return p;
-                                        return {
-                                          ...p,
-                                          comments: p.comments.map(c => {
-                                            if (String(c.id) !== String(comment.id)) return c;
-                                            const newReactions = (c.reactions || []).filter(r => r.reactionType !== userCommentReactions[key] || Number(r.userId) !== Number(user.id));
-                                            return { ...c, reactions: newReactions };
-                                          })
-                                        };
-                                      }));
-                                      setUserCommentReactions(prev => ({ ...prev, [key]: null }));
-                                      // Add Like reaction and update state
-                                      await handleAddCommentReaction(post.id, comment.id, 'like');
-                                    } else {
-                                      // Unselect: remove reaction and update state
-                                      await feedApi.removeReactionFromCommentWithQuery(Number(post.id), Number(comment.id), user.id, userCommentReactions[key]!);
-                                      setPosts(prevPosts => prevPosts.map(p => {
-                                        if (String(p.id) !== String(post.id)) return p;
-                                        return {
-                                          ...p,
-                                          comments: p.comments.map(c => {
-                                            if (String(c.id) !== String(comment.id)) return c;
-                                            const newReactions = (c.reactions || []).filter(r => r.reactionType !== userCommentReactions[key] || Number(r.userId) !== Number(user.id));
-                                            return { ...c, reactions: newReactions };
-                                          })
-                                        };
-                                      }));
-                                      setUserCommentReactions(prev => ({ ...prev, [key]: null }));
-                                    }
-                                  }}
-                                  onMouseEnter={() => handleCommentReactionPopoverOpen(post.id, comment.id, true)}
-                                  onMouseLeave={() => handleCommentReactionPopoverOpen(post.id, comment.id, false)}
-                                  role="button"
-                                  tabIndex={0}
-                                >
-                                  <span className="text-xl mr-1">{REACTION_EMOJIS['like']}</span>
-                                  <span>{REACTION_NAMES['like']}</span>
-                                </span>
-                              </PopoverTrigger>
-                              <PopoverContent
-                                side="top"
-                                align="center"
-                                className="flex gap-2 p-2 w-auto bg-white shadow-lg rounded-full border border-gray-200"
-                                onMouseEnter={() => handleCommentReactionPopoverOpen(post.id, comment.id, true)}
-                                onMouseLeave={() => handleCommentReactionPopoverOpen(post.id, comment.id, false)}
-                              >
-                                {REACTION_TYPES.map(type => (
-                                  <button
-                                    key={type}
-                                    className="text-2xl hover:scale-125 transition-transform px-2 py-1 focus:outline-none"
+                            <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
+                              <Popover open={!!commentReactionPopoverOpen[`${post.id}_${comment.id}`]} onOpenChange={open => handleCommentReactionPopoverOpen(post.id, comment.id, open)}>
+                                <PopoverTrigger asChild>
+                                  <span
+                                    className={`inline-flex items-center cursor-pointer select-none ${userCommentReactions[`${post.id}_${comment.id}`] ? 'text-primary' : ''}`}
                                     onClick={async () => {
                                       const key = `${post.id}_${comment.id}`;
                                       if (!userCommentReactions[key]) {
-                                        await handleAddCommentReaction(post.id, comment.id, type);
-                                      } else if (userCommentReactions[key] !== type) {
+                                        await handleAddCommentReaction(post.id, comment.id, 'like');
+                                      } else if (userCommentReactions[key] !== 'like') {
                                         await feedApi.removeReactionFromCommentWithQuery(Number(post.id), Number(comment.id), user.id, userCommentReactions[key]!);
                                         // Update state to remove old reaction
                                         setPosts(prevPosts => prevPosts.map(p => {
@@ -1509,23 +1488,82 @@ const SocialFeed = () => {
                                           };
                                         }));
                                         setUserCommentReactions(prev => ({ ...prev, [key]: null }));
-                                        // Add new reaction and update state
-                                        await handleAddCommentReaction(post.id, comment.id, type);
+                                        // Add Like reaction and update state
+                                        await handleAddCommentReaction(post.id, comment.id, 'like');
+                                      } else {
+                                        // Unselect: remove reaction and update state
+                                        await feedApi.removeReactionFromCommentWithQuery(Number(post.id), Number(comment.id), user.id, userCommentReactions[key]!);
+                                        setPosts(prevPosts => prevPosts.map(p => {
+                                          if (String(p.id) !== String(post.id)) return p;
+                                          return {
+                                            ...p,
+                                            comments: p.comments.map(c => {
+                                              if (String(c.id) !== String(comment.id)) return c;
+                                              const newReactions = (c.reactions || []).filter(r => r.reactionType !== userCommentReactions[key] || Number(r.userId) !== Number(user.id));
+                                              return { ...c, reactions: newReactions };
+                                            })
+                                          };
+                                        }));
+                                        setUserCommentReactions(prev => ({ ...prev, [key]: null }));
                                       }
                                     }}
-                                    type="button"
+                                    onMouseEnter={() => handleCommentReactionPopoverOpen(post.id, comment.id, true)}
+                                    onMouseLeave={() => handleCommentReactionPopoverOpen(post.id, comment.id, false)}
+                                    role="button"
+                                    tabIndex={0}
                                   >
-                                    {REACTION_EMOJIS[type]}
-                                  </button>
-                                ))}
-                              </PopoverContent>
-                            </Popover>
-                            <button className="hover:text-foreground">Reply</button>
+                                    <span className="text-xl mr-1">{REACTION_EMOJIS['like']}</span>
+                                    <span>{REACTION_NAMES['like']}</span>
+                                  </span>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                  side="top"
+                                  align="center"
+                                  className="flex gap-2 p-2 w-auto bg-white shadow-lg rounded-full border border-gray-200"
+                                  onMouseEnter={() => handleCommentReactionPopoverOpen(post.id, comment.id, true)}
+                                  onMouseLeave={() => handleCommentReactionPopoverOpen(post.id, comment.id, false)}
+                                >
+                                  {REACTION_TYPES.map(type => (
+                                    <button
+                                      key={type}
+                                      className="text-2xl hover:scale-125 transition-transform px-2 py-1 focus:outline-none"
+                                      onClick={async () => {
+                                        const key = `${post.id}_${comment.id}`;
+                                        if (!userCommentReactions[key]) {
+                                          await handleAddCommentReaction(post.id, comment.id, type);
+                                        } else if (userCommentReactions[key] !== type) {
+                                          await feedApi.removeReactionFromCommentWithQuery(Number(post.id), Number(comment.id), user.id, userCommentReactions[key]!);
+                                          // Update state to remove old reaction
+                                          setPosts(prevPosts => prevPosts.map(p => {
+                                            if (String(p.id) !== String(post.id)) return p;
+                                            return {
+                                              ...p,
+                                              comments: p.comments.map(c => {
+                                                if (String(c.id) !== String(comment.id)) return c;
+                                                const newReactions = (c.reactions || []).filter(r => r.reactionType !== userCommentReactions[key] || Number(r.userId) !== Number(user.id));
+                                                return { ...c, reactions: newReactions };
+                                              })
+                                            };
+                                          }));
+                                          setUserCommentReactions(prev => ({ ...prev, [key]: null }));
+                                          // Add new reaction and update state
+                                          await handleAddCommentReaction(post.id, comment.id, type);
+                                        }
+                                      }}
+                                      type="button"
+                                    >
+                                      {REACTION_EMOJIS[type]}
+                                    </button>
+                                  ))}
+                                </PopoverContent>
+                              </Popover>
+                              <button className="hover:text-foreground">Reply</button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                   
                   {/* Add comment */}
                   <div className="flex gap-3 w-full mt-4 px-4 pb-2">
@@ -1559,14 +1597,14 @@ const SocialFeed = () => {
           </div>
         </TabsContent>
         
-        <TabsContent value="achievements">
+        <TabsContent value="appreciation">
           <div className="space-y-6">
             {getFilteredPosts().length === 0 ? (
               <Card className="backdrop-blur-sm bg-card/50 border-border/50">
                 <CardContent className="flex items-center justify-center py-12">
                   <div className="text-center">
-                    <Award className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                    <p className="text-muted-foreground">No achievements yet.</p>
+                    <ThumbsUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-muted-foreground">No appreciations yet.</p>
                   </div>
                 </CardContent>
               </Card>
@@ -1659,9 +1697,14 @@ const SocialFeed = () => {
                         ))}
                       </PopoverContent>
                     </Popover>
-                    <Button variant="ghost" size="sm" className="flex-1 flex items-center justify-center px-0 py-2 rounded-none font-medium transition hover:bg-muted/50">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="flex-1 flex items-center justify-center px-0 py-2 rounded-none font-medium transition hover:bg-muted/50"
+                      onClick={() => toggleComments(post.id)}
+                    >
                       <MessageCircle className="h-4 w-4 mr-1" />
-                      Comment
+                      {commentsVisible[post.id] ? 'Hide Comments' : 'Comment'}
                     </Button>
                     <Button variant="ghost" size="sm" className="flex-1 flex items-center justify-center px-0 py-2 rounded-none font-medium transition hover:bg-muted/50">
                       <Share2 className="h-4 w-4 mr-1" />
@@ -1686,94 +1729,37 @@ const SocialFeed = () => {
                   </div>
                   
                   {/* Comments */}
-                  <div className="w-full mt-4 space-y-3 px-4">
-                    {post.comments.map((comment) => (
-                      <div key={comment.id} className="flex gap-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={comment.author.avatar} alt={comment.author.name} />
-                          <AvatarFallback>
-                            {comment.author.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <div className="bg-muted/50 backdrop-blur-sm p-3 rounded-lg inline-block max-w-xs min-w-0 break-words">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold">{comment.author.name}</span>
-                              <span className="text-xs text-muted-foreground">{formatDate(comment.timestamp)}</span>
+                  {commentsVisible[post.id] && (
+                    <div className="w-full mt-4 space-y-3 px-4">
+                      {post.comments.map((comment) => (
+                        <div key={comment.id} className="flex gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={comment.author.avatar} alt={comment.author.name} />
+                            <AvatarFallback>
+                              {comment.author.name
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <div className="bg-muted/50 backdrop-blur-sm p-3 rounded-lg inline-block max-w-xs min-w-0 break-words">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">{comment.author.name}</span>
+                                <span className="text-xs text-muted-foreground">{formatDate(comment.timestamp)}</span>
+                              </div>
+                              <p className="text-sm">{comment.content}</p>
                             </div>
-                            <p className="text-sm">{comment.content}</p>
-                          </div>
-                          <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
-                            <Popover open={!!commentReactionPopoverOpen[`${post.id}_${comment.id}`]} onOpenChange={open => handleCommentReactionPopoverOpen(post.id, comment.id, open)}>
-                              <PopoverTrigger asChild>
-                                <span
-                                  className={`inline-flex items-center cursor-pointer select-none ${userCommentReactions[`${post.id}_${comment.id}`] ? 'text-primary' : ''}`}
-                                  onClick={async () => {
-                                    const key = `${post.id}_${comment.id}`;
-                                    if (!userCommentReactions[key]) {
-                                      await handleAddCommentReaction(post.id, comment.id, 'like');
-                                    } else if (userCommentReactions[key] !== 'like') {
-                                      await feedApi.removeReactionFromCommentWithQuery(Number(post.id), Number(comment.id), user.id, userCommentReactions[key]!);
-                                      // Update state to remove old reaction
-                                      setPosts(prevPosts => prevPosts.map(p => {
-                                        if (String(p.id) !== String(post.id)) return p;
-                                        return {
-                                          ...p,
-                                          comments: p.comments.map(c => {
-                                            if (String(c.id) !== String(comment.id)) return c;
-                                            const newReactions = (c.reactions || []).filter(r => r.reactionType !== userCommentReactions[key] || Number(r.userId) !== Number(user.id));
-                                            return { ...c, reactions: newReactions };
-                                          })
-                                        };
-                                      }));
-                                      setUserCommentReactions(prev => ({ ...prev, [key]: null }));
-                                      // Add Like reaction and update state
-                                      await handleAddCommentReaction(post.id, comment.id, 'like');
-                                    } else {
-                                      // Unselect: remove reaction and update state
-                                      await feedApi.removeReactionFromCommentWithQuery(Number(post.id), Number(comment.id), user.id, userCommentReactions[key]!);
-                                      setPosts(prevPosts => prevPosts.map(p => {
-                                        if (String(p.id) !== String(post.id)) return p;
-                                        return {
-                                          ...p,
-                                          comments: p.comments.map(c => {
-                                            if (String(c.id) !== String(comment.id)) return c;
-                                            const newReactions = (c.reactions || []).filter(r => r.reactionType !== userCommentReactions[key] || Number(r.userId) !== Number(user.id));
-                                            return { ...c, reactions: newReactions };
-                                          })
-                                        };
-                                      }));
-                                      setUserCommentReactions(prev => ({ ...prev, [key]: null }));
-                                    }
-                                  }}
-                                  onMouseEnter={() => handleCommentReactionPopoverOpen(post.id, comment.id, true)}
-                                  onMouseLeave={() => handleCommentReactionPopoverOpen(post.id, comment.id, false)}
-                                  role="button"
-                                  tabIndex={0}
-                                >
-                                  <span className="text-xl mr-1">{REACTION_EMOJIS['like']}</span>
-                                  <span>{REACTION_NAMES['like']}</span>
-                                </span>
-                              </PopoverTrigger>
-                              <PopoverContent
-                                side="top"
-                                align="center"
-                                className="flex gap-2 p-2 w-auto bg-white shadow-lg rounded-full border border-gray-200"
-                                onMouseEnter={() => handleCommentReactionPopoverOpen(post.id, comment.id, true)}
-                                onMouseLeave={() => handleCommentReactionPopoverOpen(post.id, comment.id, false)}
-                              >
-                                {REACTION_TYPES.map(type => (
-                                  <button
-                                    key={type}
-                                    className="text-2xl hover:scale-125 transition-transform px-2 py-1 focus:outline-none"
+                            <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
+                              <Popover open={!!commentReactionPopoverOpen[`${post.id}_${comment.id}`]} onOpenChange={open => handleCommentReactionPopoverOpen(post.id, comment.id, open)}>
+                                <PopoverTrigger asChild>
+                                  <span
+                                    className={`inline-flex items-center cursor-pointer select-none ${userCommentReactions[`${post.id}_${comment.id}`] ? 'text-primary' : ''}`}
                                     onClick={async () => {
                                       const key = `${post.id}_${comment.id}`;
                                       if (!userCommentReactions[key]) {
-                                        await handleAddCommentReaction(post.id, comment.id, type);
-                                      } else if (userCommentReactions[key] !== type) {
+                                        await handleAddCommentReaction(post.id, comment.id, 'like');
+                                      } else if (userCommentReactions[key] !== 'like') {
                                         await feedApi.removeReactionFromCommentWithQuery(Number(post.id), Number(comment.id), user.id, userCommentReactions[key]!);
                                         // Update state to remove old reaction
                                         setPosts(prevPosts => prevPosts.map(p => {
@@ -1788,23 +1774,82 @@ const SocialFeed = () => {
                                           };
                                         }));
                                         setUserCommentReactions(prev => ({ ...prev, [key]: null }));
-                                        // Add new reaction and update state
-                                        await handleAddCommentReaction(post.id, comment.id, type);
+                                        // Add Like reaction and update state
+                                        await handleAddCommentReaction(post.id, comment.id, 'like');
+                                      } else {
+                                        // Unselect: remove reaction and update state
+                                        await feedApi.removeReactionFromCommentWithQuery(Number(post.id), Number(comment.id), user.id, userCommentReactions[key]!);
+                                        setPosts(prevPosts => prevPosts.map(p => {
+                                          if (String(p.id) !== String(post.id)) return p;
+                                          return {
+                                            ...p,
+                                            comments: p.comments.map(c => {
+                                              if (String(c.id) !== String(comment.id)) return c;
+                                              const newReactions = (c.reactions || []).filter(r => r.reactionType !== userCommentReactions[key] || Number(r.userId) !== Number(user.id));
+                                              return { ...c, reactions: newReactions };
+                                            })
+                                          };
+                                        }));
+                                        setUserCommentReactions(prev => ({ ...prev, [key]: null }));
                                       }
                                     }}
-                                    type="button"
+                                    onMouseEnter={() => handleCommentReactionPopoverOpen(post.id, comment.id, true)}
+                                    onMouseLeave={() => handleCommentReactionPopoverOpen(post.id, comment.id, false)}
+                                    role="button"
+                                    tabIndex={0}
                                   >
-                                    {REACTION_EMOJIS[type]}
-                                  </button>
-                                ))}
-                              </PopoverContent>
-                            </Popover>
-                            <button className="hover:text-foreground">Reply</button>
+                                    <span className="text-xl mr-1">{REACTION_EMOJIS['like']}</span>
+                                    <span>{REACTION_NAMES['like']}</span>
+                                  </span>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                  side="top"
+                                  align="center"
+                                  className="flex gap-2 p-2 w-auto bg-white shadow-lg rounded-full border border-gray-200"
+                                  onMouseEnter={() => handleCommentReactionPopoverOpen(post.id, comment.id, true)}
+                                  onMouseLeave={() => handleCommentReactionPopoverOpen(post.id, comment.id, false)}
+                                >
+                                  {REACTION_TYPES.map(type => (
+                                    <button
+                                      key={type}
+                                      className="text-2xl hover:scale-125 transition-transform px-2 py-1 focus:outline-none"
+                                      onClick={async () => {
+                                        const key = `${post.id}_${comment.id}`;
+                                        if (!userCommentReactions[key]) {
+                                          await handleAddCommentReaction(post.id, comment.id, type);
+                                        } else if (userCommentReactions[key] !== type) {
+                                          await feedApi.removeReactionFromCommentWithQuery(Number(post.id), Number(comment.id), user.id, userCommentReactions[key]!);
+                                          // Update state to remove old reaction
+                                          setPosts(prevPosts => prevPosts.map(p => {
+                                            if (String(p.id) !== String(post.id)) return p;
+                                            return {
+                                              ...p,
+                                              comments: p.comments.map(c => {
+                                                if (String(c.id) !== String(comment.id)) return c;
+                                                const newReactions = (c.reactions || []).filter(r => r.reactionType !== userCommentReactions[key] || Number(r.userId) !== Number(user.id));
+                                                return { ...c, reactions: newReactions };
+                                              })
+                                            };
+                                          }));
+                                          setUserCommentReactions(prev => ({ ...prev, [key]: null }));
+                                          // Add new reaction and update state
+                                          await handleAddCommentReaction(post.id, comment.id, type);
+                                        }
+                                      }}
+                                      type="button"
+                                    >
+                                      {REACTION_EMOJIS[type]}
+                                    </button>
+                                  ))}
+                                </PopoverContent>
+                              </Popover>
+                              <button className="hover:text-foreground">Reply</button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                   
                   {/* Add comment */}
                   <div className="flex gap-3 w-full mt-4 px-4 pb-2">
