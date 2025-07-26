@@ -10,6 +10,7 @@ import {
   Users,
   Plus,
   Loader2,
+  Vote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -24,11 +25,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/components/ui/use-toast";
 import * as feedApi from "@/utils/api/feed-api";
 import * as eventsApi from "@/utils/api/events-api";
 import * as usersApi from "@/utils/api/users-api";
+import * as pollVotesApi from "@/utils/api/poll-votes-api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -44,6 +47,13 @@ interface PostComment {
   reactions?: { id: string; userId: number; reactionType: string; createdAt: string }[];
 }
 
+interface PollOption {
+  option: string;
+  votes: number;
+  percentage: number;
+  voters: User[];
+}
+
 interface Post {
   id: string;
   content: string;
@@ -55,10 +65,15 @@ interface Post {
   likes: number;
   comments: PostComment[];
   image?: string;
-  type: "post" | "event" | "birthday" | "achievement";
+  type: "post" | "event" | "birthday" | "achievement" | "poll";
   eventDate?: string;
   eventTitle?: string;
   reactions: { id: string; userId: number; reactionType: string; createdAt: string }[];
+  // Poll-specific properties
+  pollOptions?: string[];
+  pollVotes?: PollOption[];
+  userVote?: string | null;
+  totalVotes?: number;
 }
 
 interface User {
@@ -66,6 +81,13 @@ interface User {
   name: string;
   email: string;
   avatar?: string;
+}
+
+interface PollVote {
+  id: number;
+  poll_id: number;
+  user_id: number;
+  selected_option: string;
 }
 
 const REACTION_EMOJIS = {
@@ -94,7 +116,7 @@ const SocialFeed = () => {
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [creatingPost, setCreatingPost] = useState(false);
-  const [activeTab, setActiveTab] = useState("all");
+  const [activeTab, setActiveTab] = useState("posts");
   const [userCache, setUserCache] = useState<Record<number, User>>({});
   const [userReactions, setUserReactions] = useState<Record<string, string | null>>({});
   const [reactionDialogOpen, setReactionDialogOpen] = useState(false);
@@ -105,11 +127,242 @@ const SocialFeed = () => {
   const [userCommentReactions, setUserCommentReactions] = useState<Record<string, string | null>>({});
   const [commentReactionPopoverOpen, setCommentReactionPopoverOpen] = useState<Record<string, boolean>>({});
   const [commentsVisible, setCommentsVisible] = useState<Record<string, boolean>>({});
+  // Poll-related state
+  const [pollVotes, setPollVotes] = useState<PollVote[]>([]);
+  const [userVotes, setUserVotes] = useState<Record<string, string | null>>({});
+  const [voterModalOpen, setVoterModalOpen] = useState(false);
+  const [selectedPollOption, setSelectedPollOption] = useState<{ postId: string; option: string; voters: User[] } | null>(null);
 
   // Load posts on component mount
   useEffect(() => {
     loadPosts();
   }, []);
+
+  // Load poll votes when posts change
+  useEffect(() => {
+    if (posts.some(post => post.type === "poll")) {
+      loadPollVotes();
+    }
+  }, [posts]);
+
+  // Load poll votes data
+  const loadPollVotes = async () => {
+    try {
+      const response = await pollVotesApi.getPollVotes();
+      if (response.error) {
+        console.error("Failed to load poll votes:", response.error);
+        return;
+      }
+
+      const votes = response.data || [];
+      setPollVotes(votes);
+
+      // Calculate poll statistics and user votes
+      const newUserVotes: Record<string, string | null> = {};
+      const updatedPosts = posts.map(post => {
+        if (post.type !== "poll" || !post.pollOptions) return post;
+
+        const postVotes = votes.filter(vote => vote.poll_id === Number(post.id));
+        const totalVotes = postVotes.length;
+        
+        // Calculate user's vote for this poll
+        const userVote = postVotes.find(vote => vote.user_id === user?.id);
+        newUserVotes[post.id] = userVote?.selected_option || null;
+
+        // Calculate poll options with statistics
+        const pollOptions: PollOption[] = post.pollOptions.map(option => {
+          const optionVotes = postVotes.filter(vote => vote.selected_option === option);
+          const percentage = totalVotes > 0 ? (optionVotes.length / totalVotes) * 100 : 0;
+          
+          // Get voter details for avatars (up to 3)
+          const voters = optionVotes.slice(0, 3).map(vote => {
+            const voter = userCache[vote.user_id];
+            return voter || { id: vote.user_id, name: "Unknown", email: "", avatar: "" };
+          });
+
+          return {
+            option,
+            votes: optionVotes.length,
+            percentage,
+            voters
+          };
+        });
+
+        return {
+          ...post,
+          pollVotes: pollOptions,
+          userVote: userVote?.selected_option || null,
+          totalVotes
+        };
+      });
+
+      setPosts(updatedPosts);
+      setUserVotes(newUserVotes);
+
+      // Fetch missing voter details for all polls
+      const allMissingVoterIds = new Set<number>();
+      updatedPosts.forEach(post => {
+        if (post.type === "poll" && post.pollVotes) {
+          post.pollVotes.forEach(pollOption => {
+            pollOption.voters.forEach(voter => {
+              if (voter.name === "Unknown") {
+                allMissingVoterIds.add(voter.id);
+              }
+            });
+          });
+        }
+      });
+
+      if (allMissingVoterIds.size > 0) {
+        const voterPromises = Array.from(allMissingVoterIds).map(userId => fetchUserById(userId));
+        const voterResults = await Promise.all(voterPromises);
+        
+        // Update posts with fetched voter details
+        const finalUpdatedPosts = updatedPosts.map(post => {
+          if (post.type !== "poll" || !post.pollVotes) return post;
+          
+          const updatedPollVotes = post.pollVotes.map(pollOption => {
+            const updatedVoters = pollOption.voters.map(voter => {
+              if (voter.name === "Unknown") {
+                const fetchedVoter = voterResults.find(v => v?.id === voter.id);
+                return fetchedVoter || voter;
+              }
+              return voter;
+            });
+            
+            return {
+              ...pollOption,
+              voters: updatedVoters
+            };
+          });
+          
+          return {
+            ...post,
+            pollVotes: updatedPollVotes
+          };
+        });
+        
+        setPosts(finalUpdatedPosts);
+      }
+    } catch (error) {
+      console.error("Error loading poll votes:", error);
+    }
+  };
+
+  // Handle opening voter modal
+  const handleShowVoters = (postId: string, option: string, voters: User[]) => {
+    setSelectedPollOption({ postId, option, voters });
+    setVoterModalOpen(true);
+  };
+
+  // Render poll option voters section
+  const renderPollOptionVoters = (postId: string, pollOption: PollOption) => (
+    <div className="flex items-center gap-2">
+      {/* Voter avatars */}
+      <div className="flex -space-x-2">
+        {pollOption.voters.map((voter, voterIndex) => (
+          <Avatar key={voterIndex} className="h-6 w-6 border-2 border-white">
+            <AvatarImage src={voter.avatar} alt={voter.name} />
+            <AvatarFallback className="text-xs">
+              {voter.name?.charAt(0)?.toUpperCase() || '?'}
+            </AvatarFallback>
+          </Avatar>
+        ))}
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground">
+          {pollOption.votes} vote{pollOption.votes !== 1 ? 's' : ''}
+        </span>
+        {pollOption.votes > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleShowVoters(postId, pollOption.option, pollOption.voters);
+            }}
+          >
+            View all
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
+  // Handle poll vote
+  const handlePollVote = async (postId: string, selectedOption: string) => {
+    if (!user) return;
+
+    try {
+      const currentVote = userVotes[postId];
+      
+      if (currentVote === selectedOption) {
+        // Remove vote if clicking the same option
+        const voteToDelete = pollVotes.find(vote => 
+          vote.poll_id === Number(postId) && 
+          vote.user_id === user.id && 
+          vote.selected_option === selectedOption
+        );
+        
+        if (voteToDelete) {
+          const response = await pollVotesApi.deletePollVote(voteToDelete.id);
+          if (response.error) {
+            toast({
+              title: "Error",
+              description: response.error,
+              variant: "destructive",
+            });
+            return;
+          }
+        }
+      } else {
+        // Add or update vote
+        const voteData = {
+          poll_id: Number(postId),
+          user_id: user.id,
+          selected_option: selectedOption
+        };
+
+        let response;
+        if (currentVote) {
+          // Update existing vote
+          const existingVote = pollVotes.find(vote => 
+            vote.poll_id === Number(postId) && vote.user_id === user.id
+          );
+          if (existingVote) {
+            response = await pollVotesApi.updatePollVote(existingVote.id, voteData);
+          }
+        } else {
+          // Create new vote
+          response = await pollVotesApi.createPollVote(voteData);
+        }
+
+        if (response.error) {
+          toast({
+            title: "Error",
+            description: response.error,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
+      // Reload poll votes to update the UI
+      await loadPollVotes();
+      
+      toast({
+        title: "Success",
+        description: currentVote === selectedOption ? "Vote removed" : "Vote recorded",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to process vote",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Fetch user details by ID with caching
   const fetchUserById = async (userId: number): Promise<User | null> => {
@@ -255,6 +508,8 @@ const SocialFeed = () => {
           eventDate: post.event_date,
           eventTitle: post.event_title,
           reactions: reactionsData,
+          // Add poll options if this is a poll post
+          pollOptions: post.poll_options || undefined,
         };
       });
 
@@ -424,6 +679,8 @@ const SocialFeed = () => {
         return <Cake className="h-4 w-4 text-pink-500" />;
       case "achievement":
         return <Award className="h-4 w-4 text-amber-500" />;
+      case "poll":
+        return <Vote className="h-4 w-4 text-purple-500" />;
       default:
         return null;
     }
@@ -431,13 +688,22 @@ const SocialFeed = () => {
 
   // Filter posts based on active tab
   const getFilteredPosts = () => {
-    if (activeTab === "all") return posts;
+    if (activeTab === "posts") {
+      // Show all posts except events, birthdays, appreciation, and polls
+      return posts.filter((post) => 
+        post.type !== "event" && 
+        post.type !== "birthday" && 
+        post.type !== "appreciation" && 
+        post.type !== "poll"
+      );
+    }
     
     // Map tab values to post types
     const tabToTypeMap: Record<string, string> = {
       "events": "event",
       "birthdays": "birthday", 
-      "appreciation": "appreciation"
+      "appreciation": "appreciation",
+      "polls": "poll"
     };
     
     const postType = tabToTypeMap[activeTab];
@@ -630,13 +896,14 @@ const SocialFeed = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="all">All</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="posts">Posts</TabsTrigger>
           <TabsTrigger value="events">Events</TabsTrigger>
           <TabsTrigger value="birthdays">Birthdays</TabsTrigger>
           <TabsTrigger value="appreciation">Appreciation</TabsTrigger>
+          <TabsTrigger value="polls">Polls</TabsTrigger>
         </TabsList>
-        <TabsContent value="all">
+        <TabsContent value="posts">
           {/* Create post */}
           <Card className="mb-6 backdrop-blur-sm bg-card/50 border-border/50">
             <CardHeader>
@@ -762,6 +1029,59 @@ const SocialFeed = () => {
                               Congratulations on this milestone!
                             </p>
                           </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {post.type === "poll" && post.pollOptions && (
+                      <div className="mt-4 p-4 bg-purple-50 backdrop-blur-sm rounded-md">
+                        <div className="space-y-3">
+                          {post.pollVotes?.map((pollOption, index) => (
+                            <div
+                              key={pollOption.option}
+                              className={`relative p-3 rounded-lg border-2 cursor-pointer transition-all hover:bg-purple-100 ${
+                                userVotes[post.id] === pollOption.option
+                                  ? 'border-purple-500 bg-purple-100'
+                                  : 'border-gray-200 bg-white'
+                              }`}
+                              onClick={() => handlePollVote(post.id, pollOption.option)}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <Checkbox
+                                    checked={userVotes[post.id] === pollOption.option}
+                                    className="pointer-events-none"
+                                  />
+                                  <span className="font-medium">{pollOption.option}</span>
+                                </div>
+                                {renderPollOptionVoters(post.id, pollOption)}
+                              </div>
+                              
+                              {/* Progress bar */}
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div
+                                  className="bg-purple-500 h-2 rounded-full transition-all duration-300"
+                                  style={{ width: `${pollOption.percentage}%` }}
+                                />
+                              </div>
+                              
+                              {/* Percentage */}
+                              <div className="text-right mt-1">
+                                <span className="text-sm font-medium text-purple-600">
+                                  {pollOption.percentage.toFixed(1)}%
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                          
+                          {/* Total votes */}
+                          {post.totalVotes !== undefined && (
+                            <div className="text-center pt-2 border-t border-gray-200">
+                              <span className="text-sm text-muted-foreground">
+                                {post.totalVotes} total vote{post.totalVotes !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1882,6 +2202,319 @@ const SocialFeed = () => {
             )}
           </div>
         </TabsContent>
+        
+        <TabsContent value="polls">
+          <div className="space-y-6">
+            {getFilteredPosts().length === 0 ? (
+              <Card className="backdrop-blur-sm bg-card/50 border-border/50">
+                <CardContent className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <Vote className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-muted-foreground">No polls yet.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              getFilteredPosts().map((post) => (
+                <Card key={post.id} className="backdrop-blur-sm bg-card/50 border-border/50">
+                  <CardHeader className="pb-3">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-4">
+                        <Avatar>
+                          <AvatarImage src={post.author.avatar} alt={post.author.name} />
+                          <AvatarFallback>
+                            {post.author.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <CardTitle className="text-base">
+                            {post.author.name}
+                            <Badge variant="outline" className="ml-2 px-2 py-0">
+                              <span className="flex items-center gap-1">
+                                {getPostTypeIcon(post.type)}
+                                {post.type.charAt(0).toUpperCase() + post.type.slice(1)}
+                              </span>
+                            </Badge>
+                          </CardTitle>
+                          <CardDescription>{formatDate(post.timestamp)}</CardDescription>
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pb-3">
+                    <p className="whitespace-pre-line">{post.content}</p>
+                    
+                    {post.pollOptions && (
+                      <div className="mt-4 p-4 bg-purple-50 backdrop-blur-sm rounded-md">
+                        <div className="space-y-3">
+                          {post.pollVotes?.map((pollOption, index) => (
+                            <div
+                              key={pollOption.option}
+                              className={`relative p-3 rounded-lg border-2 cursor-pointer transition-all hover:bg-purple-100 ${
+                                userVotes[post.id] === pollOption.option
+                                  ? 'border-purple-500 bg-purple-100'
+                                  : 'border-gray-200 bg-white'
+                              }`}
+                              onClick={() => handlePollVote(post.id, pollOption.option)}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <Checkbox
+                                    checked={userVotes[post.id] === pollOption.option}
+                                    className="pointer-events-none"
+                                  />
+                                  <span className="font-medium">{pollOption.option}</span>
+                                </div>
+                                {renderPollOptionVoters(post.id, pollOption)}
+                              </div>
+                              
+                              {/* Progress bar */}
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div
+                                  className="bg-purple-500 h-2 rounded-full transition-all duration-300"
+                                  style={{ width: `${pollOption.percentage}%` }}
+                                />
+                              </div>
+                              
+                              {/* Percentage */}
+                              <div className="text-right mt-1">
+                                <span className="text-sm font-medium text-purple-600">
+                                  {pollOption.percentage.toFixed(1)}%
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                          
+                          {/* Total votes */}
+                          {post.totalVotes !== undefined && (
+                            <div className="text-center pt-2 border-t border-gray-200">
+                              <span className="text-sm text-muted-foreground">
+                                {post.totalVotes} total vote{post.totalVotes !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {post.image && (
+                      <div className="mt-4">
+                        <img
+                          src={post.image}
+                          alt="Post attachment"
+                          className="rounded-md max-h-96 w-full object-cover"
+                        />
+                      </div>
+                    )}
+                  </CardContent>
+                  <CardFooter className="flex items-center justify-evenly border-t pt-2 mt-2 gap-0 px-0">
+                    {/* Like button with popover for all reactions */}
+                    <Popover open={!!reactionPopoverOpen[post.id]} onOpenChange={open => handlePopoverOpen(post.id, open)}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={`flex-1 flex items-center justify-center px-0 py-2 font-medium transition hover:bg-muted/50`}
+                          onClick={() => {
+                            if (userReactions[post.id]) {
+                              handleRemoveReaction(post.id, userReactions[post.id]!);
+                            } else {
+                              handleAddReaction(post.id, 'like');
+                            }
+                          }}
+                          onMouseEnter={() => handlePopoverOpen(post.id, true)}
+                          onMouseLeave={() => handlePopoverOpen(post.id, false)}
+                          type="button"
+                        >
+                          <div className={`inline-flex items-center justify-center rounded-full min-w-[100px] max-w-[180px] w-auto ${userReactions[post.id] ? 'bg-primary text-primary-foreground' : 'bg-transparent'}`}>
+                            <span className="text-xl mr-1">{REACTION_EMOJIS[userReactions[post.id] || 'like']}</span>
+                            <span>{REACTION_NAMES[userReactions[post.id] || 'like']}</span>
+                          </div>
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        side="top"
+                        align="center"
+                        className="flex gap-2 p-2 w-auto bg-white shadow-lg rounded-full border border-gray-200"
+                        onMouseEnter={() => handlePopoverOpen(post.id, true)}
+                        onMouseLeave={() => handlePopoverOpen(post.id, false)}
+                      >
+                        {REACTION_TYPES.map(type => (
+                          <button
+                            key={type}
+                            className="text-2xl hover:scale-125 transition-transform px-2 py-1 focus:outline-none"
+                            onClick={() => handleAddReaction(post.id, type)}
+                            type="button"
+                          >
+                            {REACTION_EMOJIS[type]}
+                          </button>
+                        ))}
+                      </PopoverContent>
+                    </Popover>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="flex-1 flex items-center justify-center px-0 py-2 rounded-none font-medium transition hover:bg-muted/50"
+                      onClick={() => toggleComments(post.id)}
+                    >
+                      <MessageCircle className="h-4 w-4 mr-1" />
+                      {commentsVisible[post.id] ? 'Hide Comments' : 'Comment'}
+                    </Button>
+                    <Button variant="ghost" size="sm" className="flex-1 flex items-center justify-center px-0 py-2 rounded-none font-medium transition hover:bg-muted/50">
+                      <Share2 className="h-4 w-4 mr-1" />
+                      Share
+                    </Button>
+                  </CardFooter>
+                  
+                  {/* Reaction summary and comment count row */}
+                  <div className="px-6 pb-3">
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <button
+                          className="hover:text-foreground transition-colors"
+                          onClick={() => openReactionDialog(post)}
+                        >
+                          {getTopReactions(post.reactions).length > 0 && (
+                            <span className="flex items-center gap-1">
+                              {getTopReactions(post.reactions).slice(0, 3).map((reaction, idx) => (
+                                <span key={idx} className="text-lg">{REACTION_EMOJIS[reaction.reactionType]}</span>
+                              ))}
+                              <span>{post.reactions.length} reactions</span>
+                            </span>
+                          )}
+                        </button>
+                      </div>
+                      <button
+                        className="hover:text-foreground transition-colors"
+                        onClick={() => toggleComments(post.id)}
+                      >
+                        {post.comments.length} comment{post.comments.length !== 1 ? 's' : ''}
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Comments section */}
+                  {commentsVisible[post.id] && (
+                    <div className="px-6 pb-4 border-t border-gray-100">
+                      <div className="space-y-3 mt-3">
+                        {post.comments.map((comment) => (
+                          <div key={comment.id} className="flex gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={comment.author.avatar} alt={comment.author.name} />
+                              <AvatarFallback>
+                                {comment.author.name
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .join("")}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <div className="bg-muted/50 rounded-lg px-3 py-2">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-medium text-sm">{comment.author.name}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {formatDate(comment.timestamp)}
+                                  </span>
+                                </div>
+                                <p className="text-sm">{comment.content}</p>
+                              </div>
+                              <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                                <Popover open={!!commentReactionPopoverOpen[`${post.id}_${comment.id}`]} onOpenChange={open => handleCommentReactionPopoverOpen(post.id, comment.id, open)}>
+                                  <PopoverTrigger asChild>
+                                    <button className="hover:text-foreground transition-colors">
+                                      {REACTION_EMOJIS[userCommentReactions[`${post.id}_${comment.id}`] || 'like']}
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent
+                                    side="top"
+                                    align="center"
+                                    className="flex gap-2 p-2 w-auto bg-white shadow-lg rounded-full border border-gray-200"
+                                    onMouseEnter={() => handleCommentReactionPopoverOpen(post.id, comment.id, true)}
+                                    onMouseLeave={() => handleCommentReactionPopoverOpen(post.id, comment.id, false)}
+                                  >
+                                    {REACTION_TYPES.map(type => (
+                                      <button
+                                        key={type}
+                                        className="text-2xl hover:scale-125 transition-transform px-2 py-1 focus:outline-none"
+                                        onClick={async () => {
+                                          const key = `${post.id}_${comment.id}`;
+                                          const currentReaction = userCommentReactions[key];
+                                          if (currentReaction === type) {
+                                            // Remove reaction
+                                            await handleRemoveCommentReaction(post.id, comment.id, type);
+                                          } else if (currentReaction) {
+                                            // Replace reaction
+                                            await feedApi.removeReactionFromCommentWithQuery(Number(post.id), Number(comment.id), user.id, userCommentReactions[key]!);
+                                            // Update state to remove old reaction
+                                            setPosts(prevPosts => prevPosts.map(p => {
+                                              if (String(p.id) !== String(post.id)) return p;
+                                              return {
+                                                ...p,
+                                                comments: p.comments.map(c => {
+                                                  if (String(c.id) !== String(comment.id)) return c;
+                                                  const newReactions = (c.reactions || []).filter(r => r.reactionType !== userCommentReactions[key] || Number(r.userId) !== Number(user.id));
+                                                  return { ...c, reactions: newReactions };
+                                                })
+                                              };
+                                            }));
+                                            setUserCommentReactions(prev => ({ ...prev, [key]: null }));
+                                            // Add new reaction and update state
+                                            await handleAddCommentReaction(post.id, comment.id, type);
+                                          } else {
+                                            // Add new reaction
+                                            await handleAddCommentReaction(post.id, comment.id, type);
+                                          }
+                                        }}
+                                        type="button"
+                                      >
+                                        {REACTION_EMOJIS[type]}
+                                      </button>
+                                    ))}
+                                  </PopoverContent>
+                                </Popover>
+                                <button className="hover:text-foreground">Reply</button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Add comment */}
+                  <div className="flex gap-3 w-full mt-4 px-4 pb-2">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={user?.avatar} alt={user?.name} />
+                      <AvatarFallback>
+                        {user?.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <Textarea
+                      placeholder="Write a comment..."
+                      value={newComments[post.id] || ""}
+                      onChange={(e) => setNewComments((prev) => ({ ...prev, [post.id]: e.target.value }))}
+                      className="flex-1 resize-none rounded-lg bg-white/80 border border-gray-200 px-3 py-2"
+                      rows={1}
+                    />
+                    <Button
+                      onClick={() => handleAddComment(post.id)}
+                      disabled={!newComments[post.id]?.trim()}
+                      className="rounded-lg px-4 py-2"
+                    >
+                      Comment
+                    </Button>
+                  </div>
+                </Card>
+              ))
+            )}
+          </div>
+        </TabsContent>
       </Tabs>
 
       {/* Reaction dialog/modal */}
@@ -1908,6 +2541,41 @@ const SocialFeed = () => {
                 );
               })}
               {reactorLoading && <div className="text-center py-4">Loading...</div>}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Voter modal */}
+      <Dialog open={voterModalOpen} onOpenChange={setVoterModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Voters for "{selectedPollOption?.option}"
+            </DialogTitle>
+          </DialogHeader>
+          {selectedPollOption && (
+            <div className="space-y-2 max-h-72 overflow-y-auto">
+              {selectedPollOption.voters.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground">
+                  No voters yet for this option.
+                </div>
+              ) : (
+                selectedPollOption.voters.map((voter, idx) => (
+                  <div key={idx} className="flex items-center gap-3 p-2 rounded hover:bg-muted/50">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={voter.avatar} alt={voter.name} />
+                      <AvatarFallback>
+                        {voter.name?.split(' ').map(n => n[0]).join('')}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">{voter.name}</div>
+                      <div className="text-xs text-muted-foreground">{voter.email}</div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           )}
         </DialogContent>
