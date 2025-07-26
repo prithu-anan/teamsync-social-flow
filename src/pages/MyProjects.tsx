@@ -195,7 +195,7 @@ const MyProjects = () => {
             <Card
               key={project.id}
               className="hover:shadow-lg transition-shadow cursor-pointer backdrop-blur-sm bg-card/50 border-border/50"
-              onClick={() => navigate("/kanban")}
+              onClick={() => navigate(`/kanban?projectId=${project.id}`)}
             >
               <CardHeader>
                 <CardTitle className="text-xl">{project.name}</CardTitle>

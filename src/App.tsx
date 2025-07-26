@@ -18,6 +18,7 @@ import MyProjects from "./pages/MyProjects";
 import ForgotPassword from "./pages/ForgotPassword";
 import CheckEmail from "./pages/CheckEmail";
 import ResetPassword from "./pages/ResetPassword";
+import Profile from "./pages/Profile";
 // import Profile from "./pages/Profile";
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ const App = () => (
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/check-email" element={<CheckEmail />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            
             <Route path="/" element={<MainLayout />}>
               <Route index element={<Dashboard />} />
               <Route path="projects" element={<MyProjects />} />
@@ -43,6 +45,7 @@ const App = () => (
               <Route path="calendar" element={<Calendar />} />
               <Route path="messages" element={<Messages />} />
               <Route path="whiteboard" element={<Whiteboard />} />
+              <Route path="/profile/:userId" element={<Profile />} />
               {/* <Route path="profile" element={<Profile />} /> */}
             </Route>
             <Route path="*" element={<NotFound />} />

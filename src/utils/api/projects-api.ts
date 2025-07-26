@@ -205,6 +205,10 @@ export const getProjectTasks = async (projectId) => {
     } catch (err) {
         if (err.response) {
             return { error: err.response.data || "Failed to fetch project tasks" };
+        } else if (err.request) {
+            return { error: "No response from server. Check your connection." };
+        } else {
+            return { error: "An unexpected error occurred." };
         }
     }
 }
@@ -213,7 +217,7 @@ export const getKanbanTasks = async (projectId) => {
     const token = localStorage.getItem("teamsync_jwt");
 
     try {
-        const res = await axios.get(`${API_BASE_URL}/projects/${projectId}/tasks/kanban`, {
+        const res = await axios.get(`${API_BASE_URL}/projects/${projectId}/kanban`, {
             headers: {
                 Authorization: `Bearer ${token}`,
             },
@@ -225,6 +229,10 @@ export const getKanbanTasks = async (projectId) => {
     } catch (err) {
         if (err.response) {
             return { error: err.response.data || "Failed to fetch kanban tasks" };
+        } else if (err.request) {
+            return { error: "No response from server. Check your connection." };
+        } else {
+            return { error: "An unexpected error occurred." };
         }
     }
 } 

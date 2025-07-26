@@ -13,9 +13,10 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
-import { getUserTasks } from "@/utils/api/tasks-api";
-import { updateTask } from "@/utils/api/tasks-api";
+import { getKanbanTasks } from "@/utils/api/projects-api";
+import { getUserTasks, updateTask } from "@/utils/api/tasks-api";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "@/components/ui/use-toast";
 
 interface KanbanTask {
@@ -74,6 +75,8 @@ const dueDateOptions = [
 
 const KanbanBoard = () => {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const projectId = searchParams.get('projectId');
   const [tasks, setTasks] = useState<KanbanTask[]>([]);
   const [columns, setColumns] = useState<Record<string, KanbanTask[]>>({});
   const [loading, setLoading] = useState(true);
@@ -87,25 +90,35 @@ const KanbanBoard = () => {
 
   // Move fetchTasks outside useEffect so it can be reused
   const fetchTasks = async () => {
-    // Get userId from localStorage
-    let userId = null;
-    try {
-      const userStr = localStorage.getItem('teamsync_user');
-      if (userStr) {
-        const userObj = JSON.parse(userStr);
-        userId = userObj.id;
-      }
-    } catch (e) {
-      console.error('Failed to parse teamsync_user from localStorage:', e);
-    }
-    if (!userId) {
-      setLoading(false);
-      setError("You must be logged in to view tasks.");
-      return;
-    }
     setLoading(true);
     try {
-      const response = await getUserTasks(userId);
+      let response;
+      
+      if (projectId) {
+        // Fetch tasks for specific project
+        response = await getKanbanTasks(projectId);
+      } else {
+        // Fetch all user tasks
+        let userId = null;
+        try {
+          const userStr = localStorage.getItem('teamsync_user');
+          if (userStr) {
+            const userObj = JSON.parse(userStr);
+            userId = userObj.id;
+          }
+        } catch (e) {
+          console.error('Failed to parse teamsync_user from localStorage:', e);
+        }
+        
+        if (!userId) {
+          setLoading(false);
+          setError("You must be logged in to view tasks.");
+          return;
+        }
+        
+        response = await getUserTasks(userId);
+      }
+      
       if (response.error) {
         toast({ title: "Error", description: response.error, variant: "destructive" });
         setError("Failed to fetch tasks.");
@@ -150,7 +163,7 @@ const KanbanBoard = () => {
 
   useEffect(() => {
     fetchTasks();
-  }, []);
+  }, [projectId]);
 
   // Get color based on priority
   const getPriorityColor = (priority: string) => {
