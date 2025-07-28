@@ -92,7 +92,7 @@ export const deleteTask = async (id) => {
 export const getUserTasks = async (userId) => {
     const token = localStorage.getItem("teamsync_jwt");
     try {
-        const res = await axios.get(`${API_BASE_URL}/tasks?assigned_to=${userId}`, {
+        const res = await axios.get(`${API_BASE_URL}/tasks/${userId}`, {
             headers: {
                 Authorization: `Bearer ${token}`,
             },
@@ -103,6 +103,10 @@ export const getUserTasks = async (userId) => {
     } catch (err) {
         if (err.response) {
             return { error: err.response.data || "Failed to fetch user tasks" };
+        } else if (err.request) {
+            return { error: "No response from server. Check your connection." };
+        } else {
+            return { error: "An unexpected error occurred." };
         }
     }
 } 

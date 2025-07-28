@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import ReactionPicker from "./ReactionPicker";
 import ImagePreviewModal from "./ImagePreviewModal";
+import FileMessage from "./FileMessage";
 import type { Message } from "@/pages/Messages";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatRelativeTime } from "@/lib/utils";
@@ -175,15 +176,17 @@ const MessageItem = ({
           </div>
 
           {!isEditing ? (
-            <div
-              className={`text-sm leading-relaxed break-words px-4 py-2 rounded-2xl shadow-sm max-w-xl inline-block ${
-                isOwnMessage
-                  ? 'bg-blue-100/80 text-right rounded-br-md'
-                  : 'bg-white/80 text-left rounded-bl-md'
-              }`}
-            >
-              {message.content}
-            </div>
+            message.content && message.content.trim() && (
+              <div
+                className={`text-sm leading-relaxed break-words px-4 py-2 rounded-2xl shadow-sm max-w-xl inline-block ${
+                  isOwnMessage
+                    ? 'bg-blue-100/80 text-right rounded-br-md'
+                    : 'bg-white/80 text-left rounded-bl-md'
+                }`}
+              >
+                {message.content}
+              </div>
+            )
           ) : (
             <div className="space-y-2">
               <Textarea 
@@ -199,44 +202,13 @@ const MessageItem = ({
             </div>
           )}
 
-          {message.imageUrl && (
-            <div className="mt-2">
-              <img 
-                src={message.imageUrl} 
-                alt="sent" 
-                className="max-w-xs rounded-lg border shadow-sm hover:shadow-md transition-shadow cursor-pointer" 
-                onClick={() => setShowImagePreview(true)}
-              />
-              {showImagePreview && (
-                <ImagePreviewModal
-                  imageUrl={message.imageUrl}
-                  fileName={message.fileName || 'image'}
-                  onClose={() => setShowImagePreview(false)}
-                />
-              )}
-            </div>
-          )}
-
-          {message.fileUrl && (
-            <div className="mt-2">
-              <a 
-                href={message.fileUrl} 
-                download={message.fileName}
-                className="inline-flex items-center gap-2 px-3 py-2 bg-muted hover:bg-muted/80 rounded-lg border transition-colors"
-              >
-                <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center">
-                  {message.fileName?.endsWith('.pdf') ? '📄' : '📎'}
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium truncate max-w-[200px]">
-                    {message.fileName}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    Click to download
-                  </span>
-                </div>
-              </a>
-            </div>
+          {/* File message handling */}
+          {(message.file_url || message.fileUrl) && (
+            <FileMessage
+              fileUrl={message.file_url || message.fileUrl || ''}
+              fileName={message.fileName || 'file'}
+              fileType={message.file_type}
+            />
           )}
 
           {message.responseRequired && message.responseTime && (

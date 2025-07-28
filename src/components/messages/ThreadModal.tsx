@@ -32,17 +32,14 @@ const ThreadModal = ({ threadMessage, channel, allMessages, sendMessage, onClose
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          sendMessage({ imageUrl: ev.target?.result as string, threadId: threadMessage.threadId, channelId: channel.id });
-        };
-        reader.readAsDataURL(file);
-      } else {
-        sendMessage({ fileUrl: URL.createObjectURL(file), fileName: file.name, threadId: threadMessage.threadId, channelId: channel.id });
-      }
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      // Send files using the new file upload API
+      sendMessage({ 
+        content: files.length === 1 ? `📎 ${files[0].name}` : `📎 ${files.length} files`,
+        files: files,
+        thread_parent_id: threadMessage.id
+      });
     }
   };
 
@@ -71,7 +68,7 @@ const ThreadModal = ({ threadMessage, channel, allMessages, sendMessage, onClose
         <div className="border-t border-border p-3 flex items-end gap-2 bg-background">
           <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()}>
             <Image className="h-4 w-4" />
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+            <input ref={fileInputRef} type="file" accept="image/*,.pdf,.doc,.docx,.txt,.xls,.xlsx,.csv,.ppt,.pptx" className="hidden" onChange={handleFileChange} multiple />
           </Button>
           <Button variant="ghost" size="icon"><Smile className="h-4 w-4" /></Button>
           <Textarea

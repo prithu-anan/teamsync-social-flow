@@ -238,3 +238,67 @@ export const deleteMessage = async (channelId, messageId) => {
         }
     }
 } 
+
+export const sendFileMessage = async (channelId, req) => {
+    const token = localStorage.getItem("teamsync_jwt");
+
+    try {
+        // Create FormData for file upload
+        const formData = new FormData();
+        
+        // Add files to FormData
+        if (req.files && req.files.length > 0) {
+            req.files.forEach((file, index) => {
+                formData.append('files', file);
+            });
+        }
+        
+        // Add optional message content
+        if (req.content) {
+            formData.append('content', req.content);
+        }
+        
+        // Add optional recipient_id
+        if (req.recipient_id) {
+            formData.append('recipient_id', req.recipient_id);
+        }
+        
+        // Add optional thread_parent_id
+        if (req.thread_parent_id) {
+            formData.append('thread_parent_id', req.thread_parent_id);
+        }
+
+        console.log("Sending file message to channel:", channelId);
+        console.log("Files count:", req.files?.length || 0);
+        console.log("FormData entries:");
+        for (let [key, value] of formData.entries()) {
+            console.log(`${key}:`, value);
+        }
+
+        // Use the dedicated files endpoint as shown in the successful API call
+        console.log("Making request to:", `${API_BASE_URL}/channels/files?channelId=${channelId}`);
+        const res = await axios.post(`${API_BASE_URL}/channels/files?channelId=${channelId}`, formData, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                // Don't set Content-Type manually - let axios set it with boundary
+            },
+        });
+
+        if (res.status === 200 || res.status === 201) {
+            return res.data;
+        } else {
+            return { error: `Unexpected status: ${res.status}` };
+        }
+    } catch (err) {
+        console.error("Send file message error:", err);
+        if (err.response) {
+            console.error("Error response:", err.response.data);
+            console.error("Error status:", err.response.status);
+            return { error: err.response.data || "Failed to send file message" };
+        } else if (err.request) {
+            return { error: "No response from server. Check your connection." };
+        } else {
+            return { error: "An unexpected error occurred." };
+        }
+    }
+}

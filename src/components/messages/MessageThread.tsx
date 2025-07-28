@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import MessageItem from "./MessageItem";
 import EmojiPicker from "./EmojiPicker";
-import type { Message, Channel } from "@/pages/Messages";
+import type { Message, Channel } from "@/types/messages";
 import ThreadModal from './ThreadModal';
 import PinnedMessagesModal from './PinnedMessagesModal';
 import { useAuth } from "@/contexts/AuthContext";
@@ -85,26 +85,13 @@ const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMes
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          sendMessage({ 
-            content: `📷 ${file.name}`,
-            imageUrl: ev.target?.result as string 
-          });
-        };
-        reader.readAsDataURL(file);
-      } else {
-        // Create a temporary URL for the file
-        const fileUrl = URL.createObjectURL(file);
-        sendMessage({ 
-          content: `📎 ${file.name}`,
-          fileUrl: fileUrl, 
-          fileName: file.name 
-        });
-      }
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      // Send files using the new file upload API
+      sendMessage({ 
+        content: files.length === 1 ? `📎 ${files[0].name}` : `📎 ${files.length} files`,
+        files: files
+      });
     }
   };
 
@@ -214,7 +201,7 @@ const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMes
   });
 
   return (
-    <div className="flex flex-col h-full min-h-0">
+    <div className="flex flex-col h-full min-h-0 w-full overflow-hidden">
       {/* Pinned Banner */}
       {latestPinned && (
         <div className="bg-yellow-100 border-b border-yellow-300 text-yellow-900 px-4 py-2 cursor-pointer flex items-center gap-2 justify-between" onClick={() => setShowPinnedModal(true)}>
@@ -238,8 +225,8 @@ const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMes
         <div className="hidden" />
       )}
       {/* Messages Area - Scrollable */}
-      <ScrollArea className="flex-1 min-h-0">
-        <div className="p-6 space-y-6">
+      <ScrollArea className="flex-1 min-h-0 overflow-hidden">
+        <div className="p-6 space-y-6 pb-0">
           {channelMessages.map((message) => {
             const isOwnMessage = user?.id && message.sender_id && String(user.id) === String(message.sender_id);
             return (
@@ -270,7 +257,7 @@ const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMes
         </div>
       </ScrollArea>
       {/* Message Input - Fixed at bottom */}
-      <div className="p-4 border-t border-border bg-background/30">
+      <div className="p-4 border-t border-border bg-background/30 flex-shrink-0">
         {replyingTo && (
           <div className="mb-3 p-3 bg-muted rounded-lg flex items-center justify-between">
             <div className="truncate">
@@ -333,7 +320,8 @@ const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMes
               id="file-upload"
               className="hidden"
               onChange={handleFileChange}
-              accept="image/*,.pdf,.doc,.docx,.txt"
+              accept="image/*,.pdf,.doc,.docx,.txt,.xls,.xlsx,.csv,.ppt,.pptx"
+              multiple
             />
             <label htmlFor="file-upload">
               <Button variant="ghost" size="icon" className="h-10 w-10" asChild>
@@ -368,7 +356,15 @@ const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMes
         </div>
       </div>
       {/* Thread view modal or side panel */}
-      {openThread && <ThreadModal threadMessage={openThread.message} channel={channel} allMessages={messages} sendMessage={sendMessage} onClose={() => setOpenThread(null)} />}
+      {openThread && (
+        <ThreadModal 
+          threadMessage={openThread.message} 
+          channel={channel} 
+          allMessages={messages} 
+          sendMessage={sendMessage} 
+          onClose={() => setOpenThread(null)} 
+        />
+      )}
     </div>
   );
 };

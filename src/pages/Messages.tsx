@@ -17,51 +17,11 @@ import {
   sendMessage,
   getUsers,
   editMessage,
-  deleteMessage
+  deleteMessage,
+  sendFileMessage
 } from "@/utils/api-helpers";
 import { toast } from "@/components/ui/use-toast";
-
-export interface Channel {
-  id: string;
-  name: string;
-  type: 'direct' | 'group';
-  isOnline?: boolean;
-  unreadCount?: number;
-  lastMessage?: string;
-  lastMessageTime?: string;
-  participants?: string[];
-  project?: string;
-  recipient_id?: string | null;
-  channel_id?: string | null;
-}
-
-export interface Message {
-  id: string;
-  sender_id: string;
-  channel_id?: string | null;
-  recipient_id?: string | null;
-  content: string;
-  timestamp: string;
-  thread_parent_id?: string | null;
-  userName?: string;
-  userAvatar?: string;
-  reactions?: { emoji: string; count: number; users: string[] }[];
-  isUrgent?: boolean;
-  responseRequired?: boolean;
-  responseTime?: string;
-  fileUrl?: string;
-  fileName?: string;
-  imageUrl?: string;
-  updateType?: 'reaction' | 'new' | 'edit' | 'delete';
-  isOptimistic?: boolean;
-}
-
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-}
+import type { Channel, Message, User } from "@/types/messages";
 
 const ChannelInfoSidebar = ({ channel }) => {
   const { user } = useAuth();
@@ -351,6 +311,13 @@ const Messages = () => {
         userAvatar: users.find(u => u.id?.toString() === msg.sender_id?.toString())?.avatar || 
                    users.find(u => u.id?.toString() === msg.sender_id)?.avatar || 
                    '/placeholder.svg',
+        // File-related fields from API
+        file_url: msg.file_url || null,
+        file_type: msg.file_type || null,
+        // Legacy fields for backward compatibility
+        fileUrl: msg.file_url || msg.fileUrl || null,
+        fileName: msg.file_name || msg.fileName || 'file',
+        imageUrl: msg.file_type?.startsWith('image/') ? msg.file_url : null,
         reactions: [], // API doesn't provide reactions yet
       }));
 
@@ -456,7 +423,7 @@ const Messages = () => {
           setAllMessages(prev => prev.map(m => 
             m.id === msg.id ? updatedMessageInState : m
           ));
-          toast({ title: "Success", description: response.message || "Message updated successfully" });
+
         } else {
           toast({ title: "Error", description: response?.message || response?.error || "Failed to update message", variant: "destructive" });
         }
@@ -471,7 +438,7 @@ const Messages = () => {
         const response = await deleteMessage(selectedChannel.channel_id, msg.id);
         if (response && !response.error) {
           setAllMessages(prev => prev.filter(m => m.id !== msg.id));
-          toast({ title: "Message deleted" });
+
         } else {
           toast({ title: "Error", description: "Failed to delete message", variant: "destructive" });
         }
@@ -512,17 +479,29 @@ const Messages = () => {
           console.log("Channel ID being used:", selectedChannel.channel_id);
           console.log("Message content being sent:", msg.content);
           
-          // Ensure we have valid content
-          if (!msg.content || msg.content.trim() === '') {
-            console.error("Empty message content");
-            return;
+          // Check if this is a file message
+          if (msg.files && msg.files.length > 0) {
+            // Handle file upload
+            response = await sendFileMessage(selectedChannel.channel_id, {
+              files: msg.files,
+              content: msg.content || '',
+              recipient_id: selectedChannel.recipient_id || null,
+              thread_parent_id: msg.thread_parent_id || null
+            });
+          } else {
+            // Handle text message
+            // Ensure we have valid content
+            if (!msg.content || msg.content.trim() === '') {
+              console.error("Empty message content");
+              return;
+            }
+            
+            response = await sendMessage(selectedChannel.channel_id, { 
+              content: msg.content.trim(),
+              recipient_id: selectedChannel.recipient_id || null,
+              thread_parent_id: msg.thread_parent_id || null
+            });
           }
-          
-          response = await sendMessage(selectedChannel.channel_id, { 
-            content: msg.content.trim(),
-            recipient_id: selectedChannel.recipient_id || null,
-            thread_parent_id: msg.thread_parent_id || null
-          });
         } else {
           console.error("Invalid channel configuration for sending message");
           return;
@@ -549,31 +528,41 @@ const Messages = () => {
           // Success! The message was created
           console.log("Message sent successfully:", response);
           
-          // Add the new message to the list optimistically
-          const newMessage: Message = {
-            id: `msg-${Date.now()}`, // Temporary ID until we get the real one
-            sender_id: user?.id || '',
-            channel_id: selectedChannel.channel_id || null,
-            recipient_id: selectedChannel.recipient_id || null,
-            content: msg.content || '',
-            timestamp: new Date().toISOString(),
-            userName: user?.name || 'You',
-            userAvatar: user?.avatar || '/placeholder.svg',
-            isOptimistic: true, // Mark as optimistic for styling
-          };
 
-          setAllMessages(prev => [...prev, newMessage]);
           
-          // Remove the optimistic flag after a short delay to show the message is confirmed
-          setTimeout(() => {
-            setAllMessages(prev => 
-              prev.map(m => 
-                m.id === newMessage.id 
-                  ? { ...m, isOptimistic: false }
-                  : m
-              )
-            );
-          }, 1000); // Remove optimistic flag after 1 second
+          // For file uploads, fetch the updated messages to get the actual file data
+          if (msg.files && msg.files.length > 0) {
+            console.log("File uploaded successfully, fetching updated messages...");
+            setMessagesLoading(true);
+            await fetchMessages(selectedChannel);
+            setMessagesLoading(false);
+          } else {
+            // For text messages, add optimistically
+            const newMessage: Message = {
+              id: `msg-${Date.now()}`, // Temporary ID until we get the real one
+              sender_id: user?.id || '',
+              channel_id: selectedChannel.channel_id || null,
+              recipient_id: selectedChannel.recipient_id || null,
+              content: msg.content || '',
+              timestamp: new Date().toISOString(),
+              userName: user?.name || 'You',
+              userAvatar: user?.avatar || '/placeholder.svg',
+              isOptimistic: true, // Mark as optimistic for styling
+            };
+
+            setAllMessages(prev => [...prev, newMessage]);
+            
+            // Remove the optimistic flag after a short delay to show the message is confirmed
+            setTimeout(() => {
+              setAllMessages(prev => 
+                prev.map(m => 
+                  m.id === newMessage.id 
+                    ? { ...m, isOptimistic: false }
+                    : m
+                )
+              );
+            }, 1000); // Remove optimistic flag after 1 second
+          }
           
           return;
         }
@@ -582,6 +571,16 @@ const Messages = () => {
           toast({
             title: "Error",
             description: response.error,
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // If we get here but no success response, show a generic error
+        if (!response.code || (response.code !== 201 && response.status !== "CREATED")) {
+          toast({
+            title: "Error",
+            description: response.message || "Failed to send message",
             variant: "destructive",
           });
           return;
@@ -689,9 +688,9 @@ const Messages = () => {
   };
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="flex h-screen overflow-hidden" style={{ height: 'calc(100vh - 8rem)' }}>
       {/* Sidebar and main chat area */}
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 flex min-h-0 overflow-hidden">
         {/* Channel Sidebar - Fixed height with internal scrolling */}
         <div className="w-80 border-r border-border bg-white/50 dark:bg-slate-900 flex flex-col min-h-0" style={{ minHeight: 'calc(100vh - 8rem)', maxHeight: 'calc(100vh - 8rem)' }}>
           {/* Fixed header */}
@@ -731,7 +730,7 @@ const Messages = () => {
         </div>
 
         {/* Main Content - Fixed height with internal scrolling */}
-        <div className="flex-1 flex flex-col min-h-0 bg-white/50">
+        <div className="flex-1 flex flex-col min-h-0 bg-white/50" style={{ minHeight: 'calc(100vh - 8rem)', maxHeight: 'calc(100vh - 8rem)' }}>
           {selectedChannel ? (
             <>
               {/* Channel Header - Fixed */}
@@ -764,10 +763,11 @@ const Messages = () => {
               </div>
 
               {/* Messages - Scrollable content */}
-              <div className="flex-1 min-h-0 flex flex-col">
+              <div className="flex-1 min-h-0">
                 {messagesLoading ? (
                   <div className="flex-1 flex items-center justify-center">
                     <div className="text-center text-muted-foreground">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
                       Loading messages...
                     </div>
                   </div>
