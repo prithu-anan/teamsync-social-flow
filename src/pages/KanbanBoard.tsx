@@ -13,11 +13,14 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
-import { getKanbanTasks } from "@/utils/api/projects-api";
-import { getUserTasks, updateTask } from "@/utils/api/tasks-api";
+import { getKanbanTasks, getProjectById } from "@/utils/api/projects-api";
+import { getUserTasks, updateTask, deleteTask } from "@/utils/api/tasks-api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "@/components/ui/use-toast";
+import CreateTaskDialog from "@/components/CreateTaskDialog";
+import EditTaskDialog from "@/components/EditTaskDialog";
+import MoveTaskDialog from "@/components/MoveTaskDialog";
 
 interface KanbanTask {
   id: string;
@@ -29,6 +32,7 @@ interface KanbanTask {
     name: string;
     avatar: string;
   };
+  assigned_by?: number;
   dueDate?: string;
   tags?: string[];
   comments?: number;
@@ -82,11 +86,18 @@ const KanbanBoard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState({
-    priority: [], // ["low", "medium", "high"]
-    assignee: [], // [assignee names]
+    priority: [] as string[], // ["low", "medium", "high"]
+    assignee: [] as string[], // [assignee names]
     dueDate: "all", // "all", "overdue", "today", "week", "future"
-    tags: [], // [tag strings]
+    tags: [] as string[], // [tag strings]
   });
+  const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
+  const [editTaskDialogOpen, setEditTaskDialogOpen] = useState(false);
+  const [moveTaskDialogOpen, setMoveTaskDialogOpen] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+  const [selectedTaskStatus, setSelectedTaskStatus] = useState<string>("");
+  const [selectedTaskAssignedBy, setSelectedTaskAssignedBy] = useState<number | undefined>(undefined);
+  const [projectDetails, setProjectDetails] = useState<{ name: string; description?: string } | null>(null);
 
   // Move fetchTasks outside useEffect so it can be reused
   const fetchTasks = async () => {
@@ -141,6 +152,7 @@ const KanbanBoard = () => {
                 avatar: task.assignee.profile_picture || `https://ui-avatars.com/api/?name=${task.assignee.name.replace(/\s+/g, '+')}&background=random`
               } : undefined,
               dueDate: task.due_date,
+              assigned_by: task.assigned_by,
               tags: task.tags || [],
               comments: task.comments_count || 0,
               attachments: task.attachments_count || 0,
@@ -163,6 +175,31 @@ const KanbanBoard = () => {
 
   useEffect(() => {
     fetchTasks();
+  }, [projectId]);
+
+  // Fetch project details when projectId is available
+  useEffect(() => {
+    const fetchProjectDetails = async () => {
+      if (!projectId) {
+        setProjectDetails(null);
+        return;
+      }
+
+      try {
+        const response = await getProjectById(projectId);
+        if (response && !response.error) {
+          const projectData = response.data || response;
+          setProjectDetails({
+            name: projectData.title || projectData.name,
+            description: projectData.description
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching project details:", error);
+      }
+    };
+
+    fetchProjectDetails();
   }, [projectId]);
 
   // Get color based on priority
@@ -270,14 +307,80 @@ const KanbanBoard = () => {
     }
   };
 
+  // Handler functions for task actions
+  const handleDeleteTask = async (taskId: number, assignedBy?: number) => {
+    // Check if user is the assigner
+    const userId = typeof user?.id === 'string' ? parseInt(user.id) : user?.id;
+    console.log('Permission check:', { userId, assignedBy, user: user?.id });
+    if (userId !== assignedBy) {
+      toast({
+        title: "Permission Denied",
+        description: "Only the task assigner can delete this task.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const confirmed = window.confirm("Are you sure you want to delete this task? This action cannot be undone.");
+    if (!confirmed) return;
+
+    try {
+      const response = await deleteTask(taskId);
+      if (response && !response.error) {
+        toast({
+          title: "Task deleted successfully",
+          description: "The task has been permanently deleted.",
+        });
+        fetchTasks();
+      } else {
+        toast({
+          title: "Failed to delete task",
+          description: response?.error || "An error occurred while deleting the task.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error deleting task:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while deleting the task.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleEditTask = (taskId: number, assignedBy?: number) => {
+    // Check if user is the assigner
+    const userId = typeof user?.id === 'string' ? parseInt(user.id) : user?.id;
+    console.log('Edit permission check:', { userId, assignedBy, user: user?.id });
+    if (userId !== assignedBy) {
+      toast({
+        title: "Permission Denied",
+        description: "Only the task assigner can edit this task.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSelectedTaskId(taskId);
+    setEditTaskDialogOpen(true);
+  };
+
+  const handleMoveTask = (taskId: number, currentStatus: string, assignedBy?: number) => {
+    setSelectedTaskId(taskId);
+    setSelectedTaskStatus(currentStatus);
+    setSelectedTaskAssignedBy(assignedBy);
+    setMoveTaskDialogOpen(true);
+  };
+
   // Get unique assignees and tags from tasks
   const assigneeOptions = useMemo(() => {
-    const names = new Set();
+    const names = new Set<string>();
     tasks.forEach(t => t.assignee && names.add(t.assignee.name));
     return Array.from(names);
   }, [tasks]);
   const tagOptions = useMemo(() => {
-    const tags = new Set();
+    const tags = new Set<string>();
     tasks.forEach(t => t.tags && t.tags.forEach(tag => tags.add(tag)));
     return Array.from(tags);
   }, [tasks]);
@@ -335,8 +438,12 @@ const KanbanBoard = () => {
       {/* Header section */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Kanban Board</h1>
-          <p className="text-muted-foreground">Manage and track your team's tasks</p>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {projectDetails ? projectDetails.name : "Kanban Board"}
+          </h1>
+          <p className="text-muted-foreground">
+            {projectDetails?.description || "Manage and track your team's tasks"}
+          </p>
         </div>
         <div className="flex space-x-2">
           <DropdownMenu>
@@ -424,7 +531,7 @@ const KanbanBoard = () => {
               </div>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button>
+          <Button onClick={() => setCreateTaskDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" /> Add Task
           </Button>
         </div>
@@ -452,7 +559,7 @@ const KanbanBoard = () => {
                   </div>
                   <div className="flex flex-col gap-3 flex-1 min-w-0">
                     {filteredColumns[col]?.map((task, idx) => (
-                      <Draggable draggableId={task.id} index={idx} key={task.id}>
+                      <Draggable draggableId={task.id} index={idx} key={task.id || idx}>
                         {(provided, snapshot) => (
                           <div
                             ref={provided.innerRef}
@@ -486,10 +593,21 @@ const KanbanBoard = () => {
                                     </svg>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
-                                    <DropdownMenuItem>Edit</DropdownMenuItem>
-                                    <DropdownMenuItem>Move</DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => handleEditTask(parseInt(task.id), task.assigned_by)}
+                                    >
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => handleMoveTask(parseInt(task.id), task.status, task.assigned_by)}
+                                    >
+                                      Move
+                                    </DropdownMenuItem>
                                     <DropdownMenuSeparator />
-                                    <DropdownMenuItem className="text-destructive">
+                                    <DropdownMenuItem 
+                                      className="text-destructive"
+                                      onClick={() => handleDeleteTask(parseInt(task.id), task.assigned_by)}
+                                    >
                                       Delete
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
@@ -503,8 +621,8 @@ const KanbanBoard = () => {
                               )}
                               {task.tags && (
                                 <div className="flex flex-wrap gap-1 mt-3">
-                                  {task.tags.map((tag) => (
-                                    <Badge key={tag} variant="secondary" className="text-xs">
+                                  {task.tags.map((tag, tagIndex) => (
+                                    <Badge key={`${task.id}-${tag}-${tagIndex}`} variant="secondary" className="text-xs">
                                       {tag}
                                     </Badge>
                                   ))}
@@ -547,6 +665,31 @@ const KanbanBoard = () => {
           ))}
         </div>
       </DragDropContext>
+
+      {/* Create Task Dialog */}
+      <CreateTaskDialog
+        open={createTaskDialogOpen}
+        onOpenChange={setCreateTaskDialogOpen}
+        onTaskCreated={fetchTasks}
+      />
+
+      {/* Edit Task Dialog */}
+      <EditTaskDialog
+        open={editTaskDialogOpen}
+        onOpenChange={setEditTaskDialogOpen}
+        taskId={selectedTaskId}
+        onTaskUpdated={fetchTasks}
+      />
+
+      {/* Move Task Dialog */}
+      <MoveTaskDialog
+        open={moveTaskDialogOpen}
+        onOpenChange={setMoveTaskDialogOpen}
+        taskId={selectedTaskId}
+        currentStatus={selectedTaskStatus}
+        assignedBy={selectedTaskAssignedBy}
+        onTaskMoved={fetchTasks}
+      />
     </div>
   );
 };

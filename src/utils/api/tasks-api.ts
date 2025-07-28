@@ -109,4 +109,26 @@ export const getUserTasks = async (userId) => {
             return { error: "An unexpected error occurred." };
         }
     }
+}
+
+export const getTaskById = async (taskId) => {
+    const token = localStorage.getItem("teamsync_jwt");
+    try {
+        const res = await axios.get(`${API_BASE_URL}/tasks/${taskId}`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        if (res.status === 200) {
+            return res.data;
+        }
+    } catch (err) {
+        if (err.response) {
+            return { error: err.response.data || "Failed to fetch task" };
+        } else if (err.request) {
+            return { error: "No response from server. Check your connection." };
+        } else {
+            return { error: "An unexpected error occurred." };
+        }
+    }
 } 
