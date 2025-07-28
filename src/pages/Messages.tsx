@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import ChannelSidebar from "@/components/messages/ChannelSidebar";
 import MessageThread from "@/components/messages/MessageThread";
+import NewConversationDialog from "@/components/messages/NewConversationDialog";
 import { Badge } from "@/components/ui/badge";
 import ThreadModal from "@/components/messages/ThreadModal";
 import WaterBackground from '@/components/WaterBackground';
@@ -147,6 +148,7 @@ const Messages = () => {
   const [activeTab, setActiveTab] = useState("dms");
   const [openThread, setOpenThread] = useState<{message: Message, channel: Channel} | null>(null);
   const [pinnedMessages, setPinnedMessages] = useState<{[channelId: string]: Message[]}>({});
+  const [showNewConversationDialog, setShowNewConversationDialog] = useState(false);
   
   // API state
   const [allChannels, setAllChannels] = useState<Channel[]>([]);
@@ -417,6 +419,20 @@ const Messages = () => {
     await fetchMessages(channel);
   };
 
+  // Handle new conversation creation
+  const handleConversationCreated = (conversation: Channel) => {
+    // Add the new conversation to the channels list
+    setAllChannels(prev => [...prev, conversation]);
+    
+    // Switch to the appropriate tab
+    setActiveTab(conversation.type === 'direct' ? 'dms' : 'channels');
+    
+    // For newly created channels, just select it without fetching messages
+    setSelectedChannel(conversation);
+    setUnreadCounts(counts => ({ ...counts, [conversation.id]: 0 }));
+    // Don't call fetchMessages for new channels since they won't have messages yet
+  };
+
   const sendMessageHandler = async (msg: Partial<Message>) => {
     if (msg.updateType === 'edit' && msg.id && msg.content) {
       const messageToEdit = allMessages.find(m => m.id === msg.id);
@@ -672,14 +688,6 @@ const Messages = () => {
     ];
   };
 
-  // Handle starting a new conversation
-  const handleStartNewConversation = () => {
-    toast({
-      title: "New Conversation",
-      description: "Select a user to start a direct message",
-    });
-  };
-
   return (
     <div className="flex h-full min-h-0">
       {/* Sidebar and main chat area */}
@@ -690,7 +698,7 @@ const Messages = () => {
           <div className="p-4 border-b border-border bg-background/50 flex-shrink-0">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Messages</h2>
-              <Button variant="ghost" size="icon" onClick={handleStartNewConversation}>
+              <Button variant="ghost" size="icon" onClick={() => setShowNewConversationDialog(true)}>
                 <Plus className="h-4 w-4" />
               </Button>
             </div>
@@ -806,6 +814,13 @@ const Messages = () => {
       </div>
       {/* Right sidebar for channel info */}
       <ChannelInfoSidebar channel={selectedChannel} />
+      
+      {/* New Conversation Dialog */}
+      <NewConversationDialog
+        open={showNewConversationDialog}
+        onOpenChange={setShowNewConversationDialog}
+        onConversationCreated={handleConversationCreated}
+      />
     </div>
   );
 };

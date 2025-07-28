@@ -5,17 +5,29 @@ export const createChannel = async (req) => {
     const token = localStorage.getItem("teamsync_jwt");
 
     try {
-        const res = await axios.post(`${API_BASE_URL}/channels`, { name: req.name }, {
+        const requestBody = {
+            name: req.name,
+            type: "group",
+            project_id: req.project_id || null,
+            member_ids: req.members || []
+        };
+
+        console.log("Creating channel with body:", requestBody);
+
+        const res = await axios.post(`${API_BASE_URL}/channels`, requestBody, {
             headers: {
                 Authorization: `Bearer ${token}`,
             },
         });
 
-        if (res.status === 200) {
+        if (res.status === 200 || res.status === 201) {
             return res.data;
         }
     } catch (err) {
+        console.error("Create channel error:", err);
         if (err.response) {
+            console.error("Error response:", err.response.data);
+            console.error("Error status:", err.response.status);
             return { error: err.response.data || "Failed to create channel" };
         } else if (err.request) {
             return { error: "No response from server. Check your connection." };
