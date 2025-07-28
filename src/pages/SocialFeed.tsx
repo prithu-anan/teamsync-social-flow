@@ -11,6 +11,7 @@ import {
   Plus,
   Loader2,
   Vote,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -33,7 +34,9 @@ import * as eventsApi from "@/utils/api/events-api";
 import * as usersApi from "@/utils/api/users-api";
 import * as pollVotesApi from "@/utils/api/poll-votes-api";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 // Interface definitions
 interface PostComment {
@@ -133,6 +136,12 @@ const SocialFeed = () => {
   const [pollData, setPollData] = useState<Record<string, { pollVotes: PollOption[]; userVote: string | null; totalVotes: number }>>({});
   const [voterModalOpen, setVoterModalOpen] = useState(false);
   const [selectedPollOption, setSelectedPollOption] = useState<{ postId: string; option: string; voters: User[] } | null>(null);
+  
+  // Create poll dialog state
+  const [createPollDialogOpen, setCreatePollDialogOpen] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState("");
+  const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
+  const [creatingPoll, setCreatingPoll] = useState(false);
 
   // Load posts on component mount
   useEffect(() => {
@@ -287,6 +296,78 @@ const SocialFeed = () => {
   );
 
   // Handle poll vote
+  // Add poll option
+  const addPollOption = () => {
+    setPollOptions([...pollOptions, ""]);
+  };
+
+  // Remove poll option
+  const removePollOption = (index: number) => {
+    if (pollOptions.length > 2) {
+      setPollOptions(pollOptions.filter((_, i) => i !== index));
+    }
+  };
+
+  // Update poll option
+  const updatePollOption = (index: number, value: string) => {
+    const newOptions = [...pollOptions];
+    newOptions[index] = value;
+    setPollOptions(newOptions);
+  };
+
+  // Handle create poll
+  const handleCreatePoll = async () => {
+    if (!pollQuestion.trim() || pollOptions.some(option => !option.trim())) {
+      toast({
+        title: "Error",
+        description: "Please fill in the poll question and all options",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setCreatingPoll(true);
+    try {
+      const response = await feedApi.createFeedPost({
+        type: "poll",
+        content: pollQuestion,
+        media_urls: null,
+        event_date: null,
+        poll_options: pollOptions.filter(option => option.trim()),
+      });
+
+      if (response.error) {
+        toast({
+          title: "Error",
+          description: response.error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Reset form and close dialog
+      setPollQuestion("");
+      setPollOptions(["", ""]);
+      setCreatePollDialogOpen(false);
+      
+      // Reload posts to get the new poll
+      await loadPosts();
+      
+      toast({
+        title: "Success",
+        description: "Poll created successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create poll",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingPoll(false);
+    }
+  };
+
   const handlePollVote = async (postId: string, selectedOption: string) => {
     if (!user) return;
 
@@ -2194,6 +2275,23 @@ const SocialFeed = () => {
         </TabsContent>
         
         <TabsContent value="polls">
+          {/* Create Poll Button */}
+          <Card className="mb-6 backdrop-blur-sm bg-card/50 border-border/50">
+            <CardHeader>
+              <CardTitle className="text-lg">Create Poll</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Button 
+                onClick={() => setCreatePollDialogOpen(true)}
+                className="w-full"
+                variant="outline"
+              >
+                <Vote className="h-4 w-4 mr-2" />
+                Create New Poll
+              </Button>
+            </CardContent>
+          </Card>
+
           <div className="space-y-6">
             {getFilteredPosts().length === 0 ? (
               <Card className="backdrop-blur-sm bg-card/50 border-border/50">
@@ -2568,6 +2666,91 @@ const SocialFeed = () => {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Poll Dialog */}
+      <Dialog open={createPollDialogOpen} onOpenChange={setCreatePollDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create New Poll</DialogTitle>
+            <DialogDescription>
+              Create a poll to gather team feedback and opinions.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Poll Question */}
+            <div className="space-y-2">
+              <Label htmlFor="poll-question">Poll Question</Label>
+              <Textarea
+                id="poll-question"
+                placeholder="What would you like to ask?"
+                value={pollQuestion}
+                onChange={(e) => setPollQuestion(e.target.value)}
+                className="min-h-[80px]"
+              />
+            </div>
+
+            {/* Poll Options */}
+            <div className="space-y-2">
+              <Label>Poll Options</Label>
+              <div className="space-y-2">
+                {pollOptions.map((option, index) => (
+                  <div key={index} className="flex gap-2">
+                    <Input
+                      placeholder={`Option ${index + 1}`}
+                      value={option}
+                      onChange={(e) => updatePollOption(index, e.target.value)}
+                      className="flex-1"
+                    />
+                    {pollOptions.length > 2 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removePollOption(index)}
+                        className="px-2"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addPollOption}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Option
+              </Button>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCreatePollDialogOpen(false);
+                setPollQuestion("");
+                setPollOptions(["", ""]);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreatePoll}
+              disabled={creatingPoll || !pollQuestion.trim() || pollOptions.some(option => !option.trim())}
+            >
+              {creatingPoll && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Create Poll
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
