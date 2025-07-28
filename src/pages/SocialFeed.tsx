@@ -130,6 +130,7 @@ const SocialFeed = () => {
   // Poll-related state
   const [pollVotes, setPollVotes] = useState<PollVote[]>([]);
   const [userVotes, setUserVotes] = useState<Record<string, string | null>>({});
+  const [pollData, setPollData] = useState<Record<string, { pollVotes: PollOption[]; userVote: string | null; totalVotes: number }>>({});
   const [voterModalOpen, setVoterModalOpen] = useState(false);
   const [selectedPollOption, setSelectedPollOption] = useState<{ postId: string; option: string; voters: User[] } | null>(null);
 
@@ -138,12 +139,15 @@ const SocialFeed = () => {
     loadPosts();
   }, []);
 
-  // Load poll votes when posts change
+  // Load poll votes when posts change (but only if we haven't loaded them yet)
+  const [pollVotesLoaded, setPollVotesLoaded] = useState(false);
+  
   useEffect(() => {
-    if (posts.some(post => post.type === "poll")) {
+    if (posts.some(post => post.type === "poll") && !pollVotesLoaded) {
       loadPollVotes();
+      setPollVotesLoaded(true);
     }
-  }, [posts]);
+  }, [posts, pollVotesLoaded]);
 
   // Load poll votes data
   const loadPollVotes = async () => {
@@ -159,8 +163,10 @@ const SocialFeed = () => {
 
       // Calculate poll statistics and user votes
       const newUserVotes: Record<string, string | null> = {};
-      const updatedPosts = posts.map(post => {
-        if (post.type !== "poll" || !post.pollOptions) return post;
+      const newPollData: Record<string, { pollVotes: PollOption[]; userVote: string | null; totalVotes: number }> = {};
+      
+      posts.forEach(post => {
+        if (post.type !== "poll" || !post.pollOptions) return;
 
         const postVotes = votes.filter(vote => vote.poll_id === Number(post.id));
         const totalVotes = postVotes.length;
@@ -188,61 +194,51 @@ const SocialFeed = () => {
           };
         });
 
-        return {
-          ...post,
+        newPollData[post.id] = {
           pollVotes: pollOptions,
           userVote: userVote?.selected_option || null,
           totalVotes
         };
       });
 
-      setPosts(updatedPosts);
+      setPollData(newPollData);
       setUserVotes(newUserVotes);
 
       // Fetch missing voter details for all polls
       const allMissingVoterIds = new Set<number>();
-      updatedPosts.forEach(post => {
-        if (post.type === "poll" && post.pollVotes) {
-          post.pollVotes.forEach(pollOption => {
-            pollOption.voters.forEach(voter => {
-              if (voter.name === "Unknown") {
-                allMissingVoterIds.add(voter.id);
-              }
-            });
+      Object.values(newPollData).forEach(pollData => {
+        pollData.pollVotes.forEach(pollOption => {
+          pollOption.voters.forEach(voter => {
+            if (voter.name === "Unknown") {
+              allMissingVoterIds.add(voter.id);
+            }
           });
-        }
+        });
       });
 
       if (allMissingVoterIds.size > 0) {
         const voterPromises = Array.from(allMissingVoterIds).map(userId => fetchUserById(userId));
         const voterResults = await Promise.all(voterPromises);
         
-        // Update posts with fetched voter details
-        const finalUpdatedPosts = updatedPosts.map(post => {
-          if (post.type !== "poll" || !post.pollVotes) return post;
-          
-          const updatedPollVotes = post.pollVotes.map(pollOption => {
-            const updatedVoters = pollOption.voters.map(voter => {
-              if (voter.name === "Unknown") {
-                const fetchedVoter = voterResults.find(v => v?.id === voter.id);
-                return fetchedVoter || voter;
-              }
-              return voter;
-            });
-            
-            return {
+        // Update poll data with fetched voter details
+        const updatedPollData = { ...newPollData };
+        Object.keys(updatedPollData).forEach(postId => {
+          updatedPollData[postId] = {
+            ...updatedPollData[postId],
+            pollVotes: updatedPollData[postId].pollVotes.map(pollOption => ({
               ...pollOption,
-              voters: updatedVoters
-            };
-          });
-          
-          return {
-            ...post,
-            pollVotes: updatedPollVotes
+              voters: pollOption.voters.map(voter => {
+                if (voter.name === "Unknown") {
+                  const fetchedVoter = voterResults.find(v => v?.id === voter.id);
+                  return fetchedVoter || voter;
+                }
+                return voter;
+              })
+            }))
           };
         });
         
-        setPosts(finalUpdatedPosts);
+        setPollData(updatedPollData);
       }
     } catch (error) {
       console.error("Error loading poll votes:", error);
@@ -277,7 +273,7 @@ const SocialFeed = () => {
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 px-2 text-xs text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+            className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
             onClick={(e) => {
               e.stopPropagation();
               handleShowVoters(postId, pollOption.option, pollOption.voters);
@@ -349,12 +345,8 @@ const SocialFeed = () => {
       }
 
       // Reload poll votes to update the UI
+      setPollVotesLoaded(false); // Reset flag to allow reloading
       await loadPollVotes();
-      
-      toast({
-        title: "Success",
-        description: currentVote === selectedOption ? "Vote removed" : "Vote recorded",
-      });
     } catch (error) {
       toast({
         title: "Error",
@@ -515,6 +507,8 @@ const SocialFeed = () => {
 
       setPosts(transformedPosts);
       setUserReactions(newUserReactions);
+      setPollVotesLoaded(false); // Reset poll votes loaded flag when posts are reloaded
+      setPollData({}); // Clear poll data when posts are reloaded
 
       // After mapping comments in loadPosts, build userCommentReactions for all comments
       const newUserCommentReactions: Record<string, string | null> = {};
@@ -680,7 +674,7 @@ const SocialFeed = () => {
       case "achievement":
         return <Award className="h-4 w-4 text-amber-500" />;
       case "poll":
-        return <Vote className="h-4 w-4 text-purple-500" />;
+        return <Vote className="h-4 w-4 text-blue-500" />;
       default:
         return null;
     }
@@ -742,7 +736,6 @@ const SocialFeed = () => {
       });
       setPosts(newPosts);
       setUserReactions(prev => ({ ...prev, [postId]: reactionType }));
-      toast({ title: 'Reacted!', description: `You reacted with ${reactionType}.` });
     }
   };
 
@@ -759,7 +752,6 @@ const SocialFeed = () => {
       });
       setPosts(newPosts);
       setUserReactions(prev => ({ ...prev, [postId]: null }));
-      toast({ title: 'Reaction removed', description: `Your reaction was removed.` });
     }
   };
 
@@ -833,7 +825,6 @@ const SocialFeed = () => {
         };
       }));
       setUserCommentReactions(prev => ({ ...prev, [`${postId}_${commentId}`]: reactionType }));
-      toast({ title: 'Reacted!', description: `You reacted to a comment with ${reactionType}.` });
     }
   };
   const handleRemoveCommentReaction = async (postId: string, commentId: string, reactionType: string) => {
@@ -858,7 +849,6 @@ const SocialFeed = () => {
             };
           }));
           setUserCommentReactions(prev => ({ ...prev, [key]: null }));
-          toast({ title: 'Reaction removed', description: `Your reaction was removed from the comment.` });
         }
       }
     }
@@ -1033,15 +1023,15 @@ const SocialFeed = () => {
                       </div>
                     )}
                     
-                    {post.type === "poll" && post.pollOptions && (
-                      <div className="mt-4 p-4 bg-purple-50 backdrop-blur-sm rounded-md">
+                    {post.type === "poll" && post.pollOptions && pollData[post.id] && (
+                      <div className="mt-4 p-4 bg-blue-50 backdrop-blur-sm rounded-md">
                         <div className="space-y-3">
-                          {post.pollVotes?.map((pollOption, index) => (
+                          {pollData[post.id].pollVotes.map((pollOption, index) => (
                             <div
                               key={pollOption.option}
-                              className={`relative p-3 rounded-lg border-2 cursor-pointer transition-all hover:bg-purple-100 ${
+                              className={`relative p-3 rounded-lg border-2 cursor-pointer transition-all hover:bg-blue-100 ${
                                 userVotes[post.id] === pollOption.option
-                                  ? 'border-purple-500 bg-purple-100'
+                                  ? 'border-blue-500 bg-blue-100'
                                   : 'border-gray-200 bg-white'
                               }`}
                               onClick={() => handlePollVote(post.id, pollOption.option)}
@@ -1060,14 +1050,14 @@ const SocialFeed = () => {
                               {/* Progress bar */}
                               <div className="w-full bg-gray-200 rounded-full h-2">
                                 <div
-                                  className="bg-purple-500 h-2 rounded-full transition-all duration-300"
+                                  className="bg-blue-500 h-2 rounded-full transition-all duration-300"
                                   style={{ width: `${pollOption.percentage}%` }}
                                 />
                               </div>
                               
                               {/* Percentage */}
                               <div className="text-right mt-1">
-                                <span className="text-sm font-medium text-purple-600">
+                                <span className="text-sm font-medium text-blue-600">
                                   {pollOption.percentage.toFixed(1)}%
                                 </span>
                               </div>
@@ -1075,10 +1065,10 @@ const SocialFeed = () => {
                           ))}
                           
                           {/* Total votes */}
-                          {post.totalVotes !== undefined && (
+                          {pollData[post.id].totalVotes !== undefined && (
                             <div className="text-center pt-2 border-t border-gray-200">
                               <span className="text-sm text-muted-foreground">
-                                {post.totalVotes} total vote{post.totalVotes !== 1 ? 's' : ''}
+                                {pollData[post.id].totalVotes} total vote{pollData[post.id].totalVotes !== 1 ? 's' : ''}
                               </span>
                             </div>
                           )}
@@ -2247,15 +2237,15 @@ const SocialFeed = () => {
                   <CardContent className="pb-3">
                     <p className="whitespace-pre-line">{post.content}</p>
                     
-                    {post.pollOptions && (
-                      <div className="mt-4 p-4 bg-purple-50 backdrop-blur-sm rounded-md">
+                    {post.pollOptions && pollData[post.id] && (
+                      <div className="mt-4 p-4 bg-blue-50 backdrop-blur-sm rounded-md">
                         <div className="space-y-3">
-                          {post.pollVotes?.map((pollOption, index) => (
+                          {pollData[post.id].pollVotes.map((pollOption, index) => (
                             <div
                               key={pollOption.option}
-                              className={`relative p-3 rounded-lg border-2 cursor-pointer transition-all hover:bg-purple-100 ${
+                              className={`relative p-3 rounded-lg border-2 cursor-pointer transition-all hover:bg-blue-100 ${
                                 userVotes[post.id] === pollOption.option
-                                  ? 'border-purple-500 bg-purple-100'
+                                  ? 'border-blue-500 bg-blue-100'
                                   : 'border-gray-200 bg-white'
                               }`}
                               onClick={() => handlePollVote(post.id, pollOption.option)}
@@ -2274,14 +2264,14 @@ const SocialFeed = () => {
                               {/* Progress bar */}
                               <div className="w-full bg-gray-200 rounded-full h-2">
                                 <div
-                                  className="bg-purple-500 h-2 rounded-full transition-all duration-300"
+                                  className="bg-blue-500 h-2 rounded-full transition-all duration-300"
                                   style={{ width: `${pollOption.percentage}%` }}
                                 />
                               </div>
                               
                               {/* Percentage */}
                               <div className="text-right mt-1">
-                                <span className="text-sm font-medium text-purple-600">
+                                <span className="text-sm font-medium text-blue-600">
                                   {pollOption.percentage.toFixed(1)}%
                                 </span>
                               </div>
@@ -2289,10 +2279,10 @@ const SocialFeed = () => {
                           ))}
                           
                           {/* Total votes */}
-                          {post.totalVotes !== undefined && (
+                          {pollData[post.id].totalVotes !== undefined && (
                             <div className="text-center pt-2 border-t border-gray-200">
                               <span className="text-sm text-muted-foreground">
-                                {post.totalVotes} total vote{post.totalVotes !== 1 ? 's' : ''}
+                                {pollData[post.id].totalVotes} total vote{pollData[post.id].totalVotes !== 1 ? 's' : ''}
                               </span>
                             </div>
                           )}
