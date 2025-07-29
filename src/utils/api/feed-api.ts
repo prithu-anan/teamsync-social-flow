@@ -16,6 +16,7 @@ interface FeedPostWithFilesRequest extends FeedPostRequest {
 
 interface CommentRequest {
     content: string;
+    post_id?: string | number;
 }
 
 interface ReplyRequest {
@@ -193,7 +194,12 @@ export const createComment = async (feedPostId: string | number, req: CommentReq
     const token = localStorage.getItem("teamsync_jwt");
 
     try {
-        const res = await axios.post(`${API_BASE_URL}/feedposts/${feedPostId}/comments`, req, {
+        const requestBody = {
+            ...req,
+            post_id: feedPostId
+        };
+        
+        const res = await axios.post(`${API_BASE_URL}/feedposts/${feedPostId}/comments`, requestBody, {
             headers: {
                 Authorization: `Bearer ${token}`,
             },
