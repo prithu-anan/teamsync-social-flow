@@ -423,13 +423,12 @@ const Messages = () => {
       // Update payload to match new API: only channel_id, recipient_id, content
       const updatePayload = {
         channel_id: selectedChannel?.channel_id ? parseInt(selectedChannel.channel_id, 10) : null,
-        recipient_id: messageToEdit.thread_parent_id ? 1 : (messageToEdit.recipient_id ? parseInt(messageToEdit.recipient_id, 10) : null),
+        recipient_id: 1, // Always set recipient_id to 1 for message edits
         content: msg.content,
-        thread_parent_id: extractNumericId(messageToEdit.thread_parent_id),
       };
 
       try {
-        const response = await editMessage(selectedChannel.channel_id, msg.id, updatePayload);
+        const response = await editMessage(selectedChannel.channel_id, extractNumericId(msg.id), updatePayload);
         if (response && response.code === 200 && response.status === "OK") {
           // Optimistically update the UI with the new content
           const updatedMessageInState = { ...messageToEdit, content: msg.content };

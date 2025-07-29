@@ -268,15 +268,10 @@ export const sendFileMessage = async (channelId, req) => {
             formData.append('thread_parent_id', req.thread_parent_id);
         }
 
-        console.log("Sending file message to channel:", channelId);
-        console.log("Files count:", req.files?.length || 0);
-        console.log("FormData entries:");
         for (let [key, value] of formData.entries()) {
             console.log(`${key}:`, value);
         }
 
-        // Use the dedicated files endpoint as shown in the successful API call
-        console.log("Making request to:", `${API_BASE_URL}/channels/files?channelId=${channelId}`);
         const res = await axios.post(`${API_BASE_URL}/channels/files?channelId=${channelId}`, formData, {
             headers: {
                 Authorization: `Bearer ${token}`,
@@ -292,8 +287,6 @@ export const sendFileMessage = async (channelId, req) => {
     } catch (err) {
         console.error("Send file message error:", err);
         if (err.response) {
-            console.error("Error response:", err.response.data);
-            console.error("Error status:", err.response.status);
             return { error: err.response.data || "Failed to send file message" };
         } else if (err.request) {
             return { error: "No response from server. Check your connection." };
