@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Search, Hash, Users, Plus, Settings } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,7 @@ import {
 import { toast } from "@/components/ui/use-toast";
 import type { Channel, Message, User } from "@/types/messages";
 
-const ChannelInfoSidebar = ({ channel }) => {
+const ChannelInfoSidebar = ({ channel, onMemberClick }: { channel: Channel; onMemberClick?: (user: User) => void }) => {
   const { user } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
 
@@ -69,28 +70,32 @@ const ChannelInfoSidebar = ({ channel }) => {
         <ScrollArea className="max-h-60 min-h-0 pr-2">
           <div className="flex flex-col gap-3">
             {memberObjs.length > 0 ? (
-              memberObjs.map((member, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center gap-3 p-2 rounded-lg transition-colors cursor-pointer hover:bg-blue-100/60 dark:hover:bg-slate-800/40 group"
-                >
-                  {/* Avatar with fallback */}
-                  {member.avatar ? (
-                    <img
-                      src={member.avatar}
-                      alt={member.name}
-                      className="w-8 h-8 rounded-full object-cover border border-border bg-white"
-                    />
-                  ) : (
-                    <span className="w-8 h-8 rounded-full flex items-center justify-center bg-primary/10 text-lg font-bold text-primary border border-border">
-                      {member.name ? member.name.charAt(0).toUpperCase() : '?'}
+              memberObjs.map((member, idx) => {
+                const user = users.find(u => u.name === member.name);
+                return (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-3 p-2 rounded-lg transition-colors cursor-pointer hover:bg-blue-100/60 dark:hover:bg-slate-800/40 group"
+                    onClick={() => onMemberClick?.(user)}
+                  >
+                    {/* Avatar with fallback */}
+                    {member.avatar ? (
+                      <img
+                        src={member.avatar}
+                        alt={member.name}
+                        className="w-8 h-8 rounded-full object-cover border border-border bg-white"
+                      />
+                    ) : (
+                      <span className="w-8 h-8 rounded-full flex items-center justify-center bg-primary/10 text-lg font-bold text-primary border border-border">
+                        {member.name ? member.name.charAt(0).toUpperCase() : '?'}
+                      </span>
+                    )}
+                    <span className="text-base font-semibold text-gray-800 dark:text-gray-100 group-hover:text-blue-700 dark:group-hover:text-blue-300 truncate">
+                      {member.name}
                     </span>
-                  )}
-                  <span className="text-base font-semibold text-gray-800 dark:text-gray-100 group-hover:text-blue-700 dark:group-hover:text-blue-300 truncate">
-                    {member.name}
-                  </span>
-                </div>
-              ))
+                  </div>
+                );
+              })
             ) : (
               <div className="text-muted-foreground">No members listed</div>
             )}
@@ -103,6 +108,7 @@ const ChannelInfoSidebar = ({ channel }) => {
 
 const Messages = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("dms");
@@ -398,6 +404,12 @@ const Messages = () => {
     setSelectedChannel(conversation);
     setUnreadCounts(counts => ({ ...counts, [conversation.id]: 0 }));
     // Don't call fetchMessages for new channels since they won't have messages yet
+  };
+
+  const handleMemberClick = (user: User) => {
+    if (user) {
+      navigate(`/profile/${user.id}`);
+    }
   };
 
   const sendMessageHandler = async (msg: Partial<Message>) => {
@@ -827,7 +839,7 @@ const Messages = () => {
         </div>
       </div>
       {/* Right sidebar for channel info */}
-      <ChannelInfoSidebar channel={selectedChannel} />
+      <ChannelInfoSidebar channel={selectedChannel} onMemberClick={handleMemberClick} />
       
       {/* New Conversation Dialog */}
       <NewConversationDialog
