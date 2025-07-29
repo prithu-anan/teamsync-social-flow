@@ -6,7 +6,6 @@ interface FeedPostRequest {
     content: string;
     type?: string;
     event_date?: string;
-    event_title?: string;
     poll_options?: string[];
 }
 
@@ -40,7 +39,6 @@ export const createFeedPost = async (req: FeedPostWithFilesRequest) => {
             type: req.type,
             content: req.content,
             event_date: req.event_date,
-            event_title: req.event_title,
             poll_options: req.poll_options,
         };
         

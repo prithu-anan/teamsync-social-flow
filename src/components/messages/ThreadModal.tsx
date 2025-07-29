@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import MessageItem from './MessageItem';
-import type { Message, Channel } from '@/pages/Messages';
+import type { Message, Channel } from '@/types/messages';
 
 interface ThreadModalProps {
   threadMessage: Message;
@@ -17,7 +17,7 @@ interface ThreadModalProps {
 const ThreadModal = ({ threadMessage, channel, allMessages, sendMessage, onClose }: ThreadModalProps) => {
   const [reply, setReply] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const replies = allMessages.filter(m => m.threadId === threadMessage.threadId);
+  const replies = allMessages.filter(m => m.thread_parent_id === threadMessage.id);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -26,7 +26,7 @@ const ThreadModal = ({ threadMessage, channel, allMessages, sendMessage, onClose
 
   const handleSend = () => {
     if (reply.trim()) {
-      sendMessage({ content: reply, threadId: threadMessage.threadId, channelId: channel.id });
+      sendMessage({ content: reply, thread_parent_id: threadMessage.id });
       setReply('');
     }
   };
@@ -51,15 +51,30 @@ const ThreadModal = ({ threadMessage, channel, allMessages, sendMessage, onClose
           <div className="font-semibold">Thread</div>
           <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
         </div>
-        {/* Root message */}
-        <div className="p-4 border-b border-border bg-muted">
-          <MessageItem message={threadMessage} onReply={() => {}} onPin={() => {}} isPinned={false} />
+        {/* Original message that started the thread */}
+        <div className="p-4 border-b border-border bg-muted/30">
+          <MessageItem 
+            message={threadMessage} 
+            onReply={() => {}} 
+            onPin={() => {}} 
+            isPinned={false}
+            onEdit={() => {}}
+            onDelete={() => {}}
+          />
         </div>
         {/* Replies */}
         <ScrollArea className="flex-1 min-h-0">
           <div className="p-4 space-y-4">
             {replies.map(msg => (
-              <MessageItem key={msg.id} message={msg} onReply={() => {}} onPin={() => {}} isPinned={false} />
+              <MessageItem 
+                key={msg.id} 
+                message={msg} 
+                onReply={() => {}} 
+                onPin={() => {}} 
+                isPinned={false}
+                onEdit={() => {}}
+                onDelete={() => {}}
+              />
             ))}
             <div ref={scrollRef} />
           </div>

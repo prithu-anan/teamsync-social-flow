@@ -235,8 +235,39 @@ const MessageThread = ({ messages, channel, openThread, setOpenThread, pinnedMes
                 {message.thread_parent_id && (() => {
                   const repliedMsg = messages.find(m => m.id === message.thread_parent_id);
                   return repliedMsg ? (
-                    <div className="mb-1 max-w-xl px-4 py-2 rounded-xl bg-muted/40 text-xs text-muted-foreground border border-border">
-                      <span className="font-semibold">{repliedMsg.userName}:</span> {repliedMsg.content}
+                    <div className={`mb-2 max-w-xl ${isOwnMessage ? 'mr-12' : 'ml-12'}`}>
+                      <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors cursor-pointer group" onClick={() => setOpenThread({message: repliedMsg, channel})}>
+                        {/* Reply indicator line */}
+                        <div className="w-0.5 h-full bg-primary/30 rounded-full flex-shrink-0"></div>
+                        {/* Reply content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-semibold text-primary">{repliedMsg.userName}</span>
+                            <span className="text-xs text-muted-foreground">•</span>
+                            <span className="text-xs text-muted-foreground">Replying to</span>
+                          </div>
+                          <div className="text-sm text-muted-foreground truncate">
+                            {repliedMsg.content}
+                          </div>
+                          {/* Show file/image preview if the replied message has one */}
+                          {(repliedMsg.fileUrl || repliedMsg.file_url) && (
+                            <div className="mt-1">
+                              {(repliedMsg.fileType?.startsWith('image/') || repliedMsg.file_type?.startsWith('image/')) ? (
+                                <img 
+                                  src={repliedMsg.fileUrl || repliedMsg.file_url} 
+                                  alt="Replied image" 
+                                  className="w-8 h-8 rounded object-cover"
+                                />
+                              ) : (
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <span>📎</span>
+                                  <span className="truncate">{repliedMsg.fileName || 'File'}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   ) : null;
                 })()}

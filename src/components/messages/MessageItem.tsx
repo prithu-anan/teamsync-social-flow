@@ -173,6 +173,9 @@ const MessageItem = ({
             {isPinned && (
               <Pin className="h-3 w-3 text-yellow-500" />
             )}
+            {message.thread_parent_id && (
+              <Reply className="h-3 w-3 text-blue-500" />
+            )}
           </div>
 
           {!isEditing ? (
