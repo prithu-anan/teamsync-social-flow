@@ -118,15 +118,11 @@ const AppSidebar = () => {
               TeamSync
             </span>
           </NavLink>
-        ) : (
-          <NavLink to="/" className="flex items-center justify-center hover:opacity-80 transition-opacity">
-            <TeamSyncLogo className="h-8 w-8 text-teamsync-400" />
-          </NavLink>
-        )}
+        ) : null}
         <SidebarTrigger
           className={cn(
-            "ml-auto h-8 w-8 text-sidebar-foreground hover:text-sidebar-foreground/80",
-            isCollapsed && "justify-center"
+            "h-8 w-8 text-sidebar-foreground hover:text-sidebar-foreground/80",
+            isCollapsed ? "ml-auto justify-center" : "ml-auto"
           )}
         />
       </div>

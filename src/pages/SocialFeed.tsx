@@ -14,6 +14,11 @@ import {
   X,
   Image,
   Star,
+  Edit,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  ZoomIn,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -67,6 +72,7 @@ interface Post {
     name: string;
     avatar: string;
   };
+  author_id: number; // Add author_id to track post ownership
   timestamp: string;
   likes: number;
   comments: PostComment[];
@@ -153,6 +159,20 @@ const SocialFeed = () => {
   // Event post creation state
   const [eventTitle, setEventTitle] = useState("");
   const [eventDate, setEventDate] = useState("");
+
+  // Edit/Delete post state
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
+  const [editPostContent, setEditPostContent] = useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [postToDelete, setPostToDelete] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Photo modal state
+  const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number>(0);
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -662,6 +682,7 @@ const SocialFeed = () => {
               author.avatar ||
               `https://ui-avatars.com/api/?name=${encodeURIComponent(author.name)}&background=0D9488&color=fff`,
           },
+          author_id: post.author_id, // Include author_id for ownership check
           timestamp: post.created_at || post.timestamp,
           likes: reactionsData.filter((r: any) => r.reactionType === "like").length,
           comments,
@@ -712,6 +733,7 @@ const SocialFeed = () => {
       });
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
@@ -1277,6 +1299,160 @@ const SocialFeed = () => {
     await loadPosts(currentPage + 1, true);
   };
 
+  // Edit post handlers
+  const handleEditPost = (post: Post) => {
+    setEditingPostId(post.id);
+    setEditPostContent(post.content);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingPostId(null);
+    setEditPostContent("");
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingPostId || !editPostContent.trim()) return;
+    
+    setIsEditing(true);
+    try {
+      const response = await feedApi.updateFeedPost(editingPostId, {
+        content: editPostContent.trim(),
+        type: posts.find(p => p.id === editingPostId)?.type || "text",
+        author_id: user?.id
+      });
+
+      if (response.error) {
+        toast({
+          title: "Error",
+          description: response.error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update the post in the local state
+      setPosts(prevPosts => 
+        prevPosts.map(post => 
+          post.id === editingPostId 
+            ? { ...post, content: editPostContent.trim() }
+            : post
+        )
+      );
+
+      toast({
+        title: "Success",
+        description: "Post updated successfully",
+      });
+
+      handleCancelEdit();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update post",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEditing(false);
+    }
+  };
+
+  // Delete post handlers
+  const handleDeletePost = (postId: string) => {
+    setPostToDelete(postId);
+    setDeleteConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!postToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      const response = await feedApi.deleteFeedPost(postToDelete);
+
+      if (response.error) {
+        toast({
+          title: "Error",
+          description: response.error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Remove the post from local state
+      setPosts(prevPosts => prevPosts.filter(post => post.id !== postToDelete));
+
+      toast({
+        title: "Success",
+        description: "Post deleted successfully",
+      });
+
+      setDeleteConfirmOpen(false);
+      setPostToDelete(null);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete post",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteConfirmOpen(false);
+    setPostToDelete(null);
+  };
+
+  // Photo modal handlers
+  const handlePhotoClick = (photoUrl: string, photoIndex: number, allPhotoUrls: string[]) => {
+    setSelectedPhoto(photoUrl);
+    setSelectedPhotoIndex(photoIndex);
+    setPhotoUrls(allPhotoUrls);
+    setPhotoModalOpen(true);
+  };
+
+  const handleClosePhotoModal = () => {
+    setPhotoModalOpen(false);
+    setSelectedPhoto(null);
+    setSelectedPhotoIndex(0);
+    setPhotoUrls([]);
+  };
+
+  const handlePreviousPhoto = () => {
+    if (selectedPhotoIndex > 0) {
+      setSelectedPhotoIndex(selectedPhotoIndex - 1);
+      setSelectedPhoto(photoUrls[selectedPhotoIndex - 1]);
+    }
+  };
+
+  const handleNextPhoto = () => {
+    if (selectedPhotoIndex < photoUrls.length - 1) {
+      setSelectedPhotoIndex(selectedPhotoIndex + 1);
+      setSelectedPhoto(photoUrls[selectedPhotoIndex + 1]);
+    }
+  };
+
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (photoModalOpen) {
+      if (event.key === 'Escape') {
+        handleClosePhotoModal();
+      } else if (event.key === 'ArrowLeft') {
+        handlePreviousPhoto();
+      } else if (event.key === 'ArrowRight') {
+        handleNextPhoto();
+      }
+    }
+  };
+
+  // Add keyboard event listener
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [photoModalOpen, selectedPhotoIndex, photoUrls]);
+
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto flex items-center justify-center min-h-[400px]">
@@ -1457,10 +1633,62 @@ const SocialFeed = () => {
                           <CardDescription>{formatDate(post.timestamp)}</CardDescription>
                         </div>
                       </div>
+                      {/* Edit/Delete buttons for post owner */}
+                      {user && post.author_id === user.id && (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditPost(post)}
+                            disabled={isEditing}
+                            className="h-8 w-8 p-0"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeletePost(post.id)}
+                            disabled={isDeleting}
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="pb-3">
-                    <p className="whitespace-pre-line">{post.content}</p>
+                    {editingPostId === post.id ? (
+                      <div className="space-y-3">
+                        <Textarea
+                          value={editPostContent}
+                          onChange={(e) => setEditPostContent(e.target.value)}
+                          className="min-h-[100px] backdrop-blur-sm bg-background/50"
+                          placeholder="Edit your post..."
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={handleSaveEdit}
+                            disabled={isEditing || !editPostContent.trim()}
+                          >
+                            {isEditing && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                            Save
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCancelEdit}
+                            disabled={isEditing}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="whitespace-pre-line">{post.content}</p>
+                    )}
                     
                     {post.type === "event" && post.eventDate && (
                       <div className="mt-4 p-4 bg-muted backdrop-blur-sm rounded-md">
@@ -1564,14 +1792,18 @@ const SocialFeed = () => {
                     )}
                     
                     {(post.media_urls && post.media_urls.length > 0) && (
-                      <MediaGallery mediaUrls={post.media_urls} />
+                      <MediaGallery 
+                        mediaUrls={post.media_urls} 
+                        onPhotoClick={handlePhotoClick}
+                      />
                     )}
                     {(!post.media_urls || post.media_urls.length === 0) && post.image && (
                       <div className="mt-4">
                         <img
                           src={post.image}
                           alt="Post attachment"
-                          className="rounded-md max-h-96 w-full object-cover"
+                          className="rounded-md max-h-96 w-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => handlePhotoClick(post.image!, 0, [post.image!])}
                         />
                       </div>
                     )}
@@ -1942,14 +2174,18 @@ const SocialFeed = () => {
                     )}
                     
                     {post.type === "photo" && (post.media_urls && post.media_urls.length > 0) && (
-                      <MediaGallery mediaUrls={post.media_urls} />
+                      <MediaGallery 
+                        mediaUrls={post.media_urls} 
+                        onPhotoClick={handlePhotoClick}
+                      />
                     )}
                     {post.type === "photo" && (!post.media_urls || post.media_urls.length === 0) && post.image && (
                       <div className="mt-4">
                         <img
                           src={post.image}
                           alt="Post attachment"
-                          className="rounded-md max-h-96 w-full object-cover"
+                          className="rounded-md max-h-96 w-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => handlePhotoClick(post.image!, 0, [post.image!])}
                         />
                       </div>
                     )}
@@ -3000,14 +3236,18 @@ const SocialFeed = () => {
                     )}
                     
                     {(post.media_urls && post.media_urls.length > 0) && (
-                      <MediaGallery mediaUrls={post.media_urls} />
+                      <MediaGallery 
+                        mediaUrls={post.media_urls} 
+                        onPhotoClick={handlePhotoClick}
+                      />
                     )}
                     {(!post.media_urls || post.media_urls.length === 0) && post.image && (
                       <div className="mt-4">
                         <img
                           src={post.image}
                           alt="Post attachment"
-                          className="rounded-md max-h-96 w-full object-cover"
+                          className="rounded-md max-h-96 w-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => handlePhotoClick(post.image!, 0, [post.image!])}
                         />
                       </div>
                     )}
@@ -3385,14 +3625,18 @@ const SocialFeed = () => {
                     <p className="whitespace-pre-line">{post.content}</p>
                     
                     {post.type === "photo" && (post.media_urls && post.media_urls.length > 0) && (
-                      <MediaGallery mediaUrls={post.media_urls} />
+                      <MediaGallery 
+                        mediaUrls={post.media_urls} 
+                        onPhotoClick={handlePhotoClick}
+                      />
                     )}
                     {post.type === "photo" && (!post.media_urls || post.media_urls.length === 0) && post.image && (
                       <div className="mt-4">
                         <img
                           src={post.image}
                           alt="Post attachment"
-                          className="rounded-md max-h-96 w-full object-cover"
+                          className="rounded-md max-h-96 w-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => handlePhotoClick(post.image!, 0, [post.image!])}
                         />
                       </div>
                     )}
@@ -3728,6 +3972,95 @@ const SocialFeed = () => {
               Create Poll
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete Post</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this post? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={handleCancelDelete}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Delete Post
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Photo Modal */}
+      <Dialog open={photoModalOpen} onOpenChange={setPhotoModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0 bg-black/95">
+          <div className="relative w-full h-full flex items-center justify-center">
+            {/* Close button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClosePhotoModal}
+              className="absolute top-4 right-4 z-10 bg-black/50 text-white hover:bg-black/70"
+            >
+              <X className="h-6 w-6" />
+            </Button>
+
+            {/* Previous button */}
+            {selectedPhotoIndex > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handlePreviousPhoto}
+                className="absolute left-4 top-1/2 transform -translate-y-1/2 z-10 bg-black/50 text-white hover:bg-black/70"
+              >
+                <ChevronLeft className="h-8 w-8" />
+              </Button>
+            )}
+
+            {/* Next button */}
+            {selectedPhotoIndex < photoUrls.length - 1 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleNextPhoto}
+                className="absolute right-4 top-1/2 transform -translate-y-1/2 z-10 bg-black/50 text-white hover:bg-black/70"
+              >
+                <ChevronRight className="h-8 w-8" />
+              </Button>
+            )}
+
+            {/* Photo */}
+            {selectedPhoto && (
+              <div className="flex items-center justify-center w-full h-full p-4">
+                <img
+                  src={selectedPhoto}
+                  alt="Enlarged photo"
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
+            )}
+
+            {/* Photo counter */}
+            {photoUrls.length > 1 && (
+              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-10 bg-black/50 text-white px-3 py-1 rounded-full text-sm">
+                {selectedPhotoIndex + 1} / {photoUrls.length}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

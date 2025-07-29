@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Bell, Search, Plus, Users, FolderOpen } from "lucide-react";
+import { Search, Plus, Users, FolderOpen } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { searchUsers, searchProjects } from "@/utils/api/search-api";
 import { filterAndSortResults, quickFilter } from "@/utils/search-utils";
 import CreateTaskDialog from "@/components/CreateTaskDialog";
+import CreateProjectDialog from "@/components/CreateProjectDialog";
 
 interface SearchUser {
   id: string;
@@ -45,6 +46,7 @@ const Header = () => {
   const [showResults, setShowResults] = useState(false);
   const [hasLoadedData, setHasLoadedData] = useState(false);
   const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
+  const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
   // Load all users and projects once for client-side filtering
@@ -154,6 +156,11 @@ const Header = () => {
     navigate('/kanban');
   };
 
+  const handleProjectCreated = () => {
+    // Refresh the current page or navigate to projects
+    navigate('/projects');
+  };
+
   return (
     <header className="h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex items-center px-4 sticky top-0 z-10">
       <div className="md:hidden">
@@ -257,8 +264,9 @@ const Header = () => {
         </div>
 
         <div className="flex items-center gap-2 md:gap-4">
-          <Button variant="outline" size="icon">
-            <Bell className="h-4 w-4" />
+          <Button size="sm" className="hidden md:flex" onClick={() => setCreateProjectDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Project
           </Button>
 
           <Button size="sm" className="hidden md:flex" onClick={() => setCreateTaskDialogOpen(true)}>
@@ -293,7 +301,7 @@ const Header = () => {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link to="/profile">Profile</Link>
+                <Link to={`/profile/${user?.id}`}>Profile</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link to="/settings">Settings</Link>
@@ -315,6 +323,13 @@ const Header = () => {
         open={createTaskDialogOpen}
         onOpenChange={setCreateTaskDialogOpen}
         onTaskCreated={handleTaskCreated}
+      />
+
+      {/* Create Project Dialog */}
+      <CreateProjectDialog
+        open={createProjectDialogOpen}
+        onOpenChange={setCreateProjectDialogOpen}
+        onProjectCreated={handleProjectCreated}
       />
     </header>
   );

@@ -7,6 +7,7 @@ interface FeedPostRequest {
     type?: string;
     event_date?: string;
     poll_options?: string[];
+    author_id?: number;
 }
 
 interface FeedPostWithFilesRequest extends FeedPostRequest {
