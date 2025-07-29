@@ -8,7 +8,8 @@ import {
   MessageCircle,
   Bell,
   PenTool,
-  FolderKanban
+  FolderKanban,
+  Shield
 } from "lucide-react";
 import {
   Sidebar,
@@ -25,13 +26,16 @@ import {
 
 import { cn } from "@/lib/utils";
 import TeamSyncLogo from "@/components/TeamSyncLogo";
+import { useAuth } from "@/contexts/AuthContext";
 
 const AppSidebar = () => {
   const location = useLocation();
   const sidebar = useSidebar();
   const isCollapsed = sidebar.state === "collapsed";
+  const { user } = useAuth();
 
   const isActive = (path: string) => location.pathname === path;
+  const isManager = user?.designation === "manager";
 
   const navItems = [
     {
@@ -75,6 +79,20 @@ const AppSidebar = () => {
       ],
     },
   ];
+
+  // Add Manage section only for managers
+  if (isManager) {
+    navItems.push({
+      label: "Manage",
+      items: [
+        {
+          title: "Roles",
+          icon: Shield,
+          path: "/roles",
+        },
+      ],
+    });
+  }
 
   const getLinkClass = ({ isActive }: { isActive: boolean }) =>
     cn(

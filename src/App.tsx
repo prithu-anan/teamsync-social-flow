@@ -21,7 +21,9 @@ import CheckEmail from "./pages/CheckEmail";
 import ResetPassword from "./pages/ResetPassword";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import Roles from "./pages/Roles";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ManagerRoute from "./components/ManagerRoute";
 // import Profile from "./pages/Profile";
 
 const queryClient = new QueryClient();
@@ -105,6 +107,14 @@ const App = () => (
               </ProtectedRoute>
             }>
               <Route index element={<Settings />} />
+            </Route>
+            
+            <Route path="/roles" element={
+              <ManagerRoute>
+                <MainLayout />
+              </ManagerRoute>
+            }>
+              <Route index element={<Roles />} />
             </Route>
             
             <Route path="/profile/:userId" element={

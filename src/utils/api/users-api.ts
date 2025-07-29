@@ -124,4 +124,31 @@ export const deleteUser = async (id) => {
             return { error: err.response.data || "Failed to delete user" };
         }
     }
+}
+
+export const updateDesignation = async (userId, designation) => {
+    const token = localStorage.getItem("teamsync_jwt");
+
+    try {
+        const res = await axios.put(`${API_BASE_URL}/users/designation/${userId}`, {
+            designation: designation
+        }, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (res.status === 200) {
+            return res.data;
+        }
+    } catch (err) {
+        if (err.response) {
+            return { error: err.response.data || "Failed to update designation" };
+        } else if (err.request) {
+            return { error: "No response from server. Check your connection." };
+        } else {
+            return { error: "An unexpected error occurred." };
+        }
+    }
 } 

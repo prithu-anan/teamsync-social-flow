@@ -58,34 +58,15 @@ export const getMe = async () => {
   }
 };
 
-export const updateMe = async (req, file = null) => {
+export const updateMe = async (req) => {
     const token = localStorage.getItem("teamsync_jwt");
 
     try {
-        let requestData;
         let headers = {
             Authorization: `Bearer ${token}`,
         };
 
-        if (file) {
-            // Create FormData for multipart form
-            const formData = new FormData();
-            
-            // Add user data as JSON string
-            formData.append('user', JSON.stringify(req));
-            
-            // Add file
-            formData.append('file', file);
-            
-            requestData = formData;
-            // Don't set Content-Type header - let browser set it with boundary for multipart
-        } else {
-            // Send as JSON for text-only updates
-            requestData = req;
-            headers['Content-Type'] = 'application/json';
-        }
-
-        const res = await axios.post(`${API_BASE_URL}/auth/me`, requestData, {
+        const res = await axios.post(`${API_BASE_URL}/auth/me`, req, {
             headers,
         });
 
