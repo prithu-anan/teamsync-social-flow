@@ -7,11 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -20,22 +23,52 @@ const Login = () => {
     return null;
   }
 
+  const clearError = () => {
+    setError(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
+    
     const success = await login(email, password);
     setIsLoading(false);
     
     if (success) {
       navigate("/");
+    } else {
+      // The AuthContext now handles specific error messages, so we can use a generic message
+      // or let the toast handle it entirely. For better UX, we'll show a local error too.
+      setError("Please check your email and password and try again.");
     }
   };
 
   const handleDemoLogin = async () => {
     setIsLoading(true);
-    await login("john@example.com", "password123");
+    setError(null);
+    
+    const success = await login("john@example.com", "password123");
     setIsLoading(false);
-    navigate("/");
+    
+    if (success) {
+      navigate("/");
+    } else {
+      setError("Demo login failed. Please try again.");
+    }
+  };
+
+  const handleInputChange = (field: 'email' | 'password', value: string) => {
+    // Clear error when user starts typing
+    if (error) {
+      clearError();
+    }
+    
+    if (field === 'email') {
+      setEmail(value);
+    } else {
+      setPassword(value);
+    }
   };
 
   return (
@@ -56,6 +89,12 @@ const Login = () => {
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -63,8 +102,9 @@ const Login = () => {
                   type="email"
                   placeholder="name@example.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
                   required
+                  disabled={isLoading}
                 />
               </div>
               <div className="space-y-2">
@@ -79,8 +119,9 @@ const Login = () => {
                   type="password"
                   placeholder="••••••••"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => handleInputChange('password', e.target.value)}
                   required
+                  disabled={isLoading}
                 />
               </div>
             </CardContent>

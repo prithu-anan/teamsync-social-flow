@@ -49,9 +49,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const res = await loginApi({ email, password });
 
     if (!res || res.error) {
+      // Extract error message from nested structure
+      let errorMessage = "Login failed. Please try again.";
+      
+      if (res?.error) {
+        if (typeof res.error === "string") {
+          errorMessage = res.error;
+        } else if (res.error.message) {
+          errorMessage = res.error.message;
+        } else if (res.error.details) {
+          // Extract from details if available
+          const details = res.error.details;
+          const badCredentials = details["org.springframework.security.authentication.BadCredentialsException"];
+          if (badCredentials) {
+            errorMessage = badCredentials;
+          }
+        }
+      }
+
       toast({
         title: "Login failed",
-        description: res.error,
+        description: errorMessage,
         variant: "destructive",
       });
       return false;

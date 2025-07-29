@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Heart,
   MessageCircle,
@@ -12,6 +12,8 @@ import {
   Loader2,
   Vote,
   X,
+  Image,
+  Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -37,6 +39,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import MediaGallery from "@/components/MediaGallery";
 
 // Interface definitions
 interface PostComment {
@@ -68,7 +71,8 @@ interface Post {
   likes: number;
   comments: PostComment[];
   image?: string;
-  type: "post" | "event" | "birthday" | "achievement" | "poll";
+  media_urls?: string[];
+  type: "text" | "photo" | "event" | "birthday" | "achievement" | "poll" | "highlight";
   eventDate?: string;
   eventTitle?: string;
   reactions: { id: string; userId: number; reactionType: string; createdAt: string }[];
@@ -115,6 +119,9 @@ const SocialFeed = () => {
   const { user } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
   const [newPostContent, setNewPostContent] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [filePreviewUrls, setFilePreviewUrls] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [newComments, setNewComments] = useState<Record<string, string>>({});
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
@@ -142,11 +149,25 @@ const SocialFeed = () => {
   const [pollQuestion, setPollQuestion] = useState("");
   const [pollOptions, setPollOptions] = useState<string[]>(["", ""]);
   const [creatingPoll, setCreatingPoll] = useState(false);
+  
+  // Event post creation state
+  const [eventTitle, setEventTitle] = useState("");
+  const [eventDate, setEventDate] = useState("");
 
-  // Load posts on component mount
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPreviousPage, setHasPreviousPage] = useState(false);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalElements, setTotalElements] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Load posts on component mount and when active tab changes
   useEffect(() => {
-    loadPosts();
-  }, []);
+    setCurrentPage(1);
+    setPosts([]);
+    loadPosts(1, false);
+  }, [activeTab]);
 
   // Load poll votes when posts change (but only if we haven't loaded them yet)
   const [pollVotesLoaded, setPollVotesLoaded] = useState(false);
@@ -331,8 +352,6 @@ const SocialFeed = () => {
       const response = await feedApi.createFeedPost({
         type: "poll",
         content: pollQuestion,
-        media_urls: null,
-        event_date: null,
         poll_options: pollOptions.filter(option => option.trim()),
       });
 
@@ -378,7 +397,7 @@ const SocialFeed = () => {
         // Remove vote if clicking the same option
         const voteToDelete = pollVotes.find(vote => 
           vote.poll_id === Number(postId) && 
-          vote.user_id === user.id && 
+          vote.user_id === Number(user.id) && 
           vote.selected_option === selectedOption
         );
         
@@ -405,7 +424,7 @@ const SocialFeed = () => {
         if (currentVote) {
           // Update existing vote
           const existingVote = pollVotes.find(vote => 
-            vote.poll_id === Number(postId) && vote.user_id === user.id
+            vote.poll_id === Number(postId) && vote.user_id === Number(user.id)
           );
           if (existingVote) {
             response = await pollVotesApi.updatePollVote(existingVote.id, voteData);
@@ -484,20 +503,89 @@ const SocialFeed = () => {
     return userMap;
   };
 
-  const loadPosts = async () => {
-    setLoading(true);
+  const loadPosts = async (page: number = 1, append: boolean = false) => {
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
+    
     try {
-      const response = await feedApi.getFeedPosts();
-      if (response.error) {
-        toast({
-          title: "Error",
-          description: response.error,
-          variant: "destructive",
-        });
-        return;
+      // Determine the type filter based on active tab
+      let typeFilter: string | undefined;
+      if (activeTab === "posts") {
+        // For posts tab, we'll load all posts and filter for text/photo in the component
+        typeFilter = undefined;
+      } else {
+        const tabToTypeMap: Record<string, string> = {
+          "events": "event",
+          "birthdays": "birthday", 
+          "appreciation": "appreciation",
+          "polls": "poll",
+          "highlights": "highlight"
+        };
+        typeFilter = tabToTypeMap[activeTab];
       }
 
-      const feedPosts = response.data || [];
+      let feedPosts: any[] = [];
+      let metadata: any = null;
+
+      if (activeTab === "posts") {
+        // For posts tab, we need to load both text and photo posts
+        const [textResponse, photoResponse] = await Promise.all([
+          feedApi.getFeedPosts(page, 10, "text"),
+          feedApi.getFeedPosts(page, 10, "photo")
+        ]);
+
+        if (textResponse.error || photoResponse.error) {
+          toast({
+            title: "Error",
+            description: textResponse.error || photoResponse.error,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const textPosts = textResponse.data?.data || textResponse.data?.content || textResponse.data || [];
+        const photoPosts = photoResponse.data?.data || photoResponse.data?.content || photoResponse.data || [];
+        
+        // Combine and sort by created_at
+        feedPosts = [...textPosts, ...photoPosts].sort((a, b) => 
+          new Date(b.created_at || b.timestamp).getTime() - new Date(a.created_at || a.timestamp).getTime()
+        );
+
+        // For posts tab, we'll use a simplified pagination approach
+        // since we're combining two different API calls
+        const totalTextPosts = textResponse.data?.metadata?.totalElements || 0;
+        const totalPhotoPosts = photoResponse.data?.metadata?.totalElements || 0;
+        const hasMoreText = textResponse.data?.metadata?.hasNext || false;
+        const hasMorePhoto = photoResponse.data?.metadata?.hasNext || false;
+        
+        metadata = {
+          currentPage: page,
+          hasNext: hasMoreText || hasMorePhoto,
+          hasPrevious: page > 1,
+          totalPages: Math.max(
+            textResponse.data?.metadata?.totalPages || 1,
+            photoResponse.data?.metadata?.totalPages || 1
+          ),
+          totalElements: totalTextPosts + totalPhotoPosts,
+          pageSize: 20
+        };
+      } else {
+        const response = await feedApi.getFeedPosts(page, 10, typeFilter);
+        if (response.error) {
+          toast({
+            title: "Error",
+            description: response.error,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        feedPosts = response.data?.data || response.data?.content || response.data || [];
+        metadata = response.data?.metadata || response.data;
+      }
 
       // Fetch comments for each post
       const commentsPromises = feedPosts.map((post: any) => feedApi.getFeedPostComments(post.id));
@@ -577,6 +665,7 @@ const SocialFeed = () => {
           likes: reactionsData.filter((r: any) => r.reactionType === "like").length,
           comments,
           image: post.media_urls?.[0] || post.image,
+          media_urls: post.media_urls || undefined,
           type: post.type || "post",
           eventDate: post.event_date,
           eventTitle: post.event_title,
@@ -586,7 +675,21 @@ const SocialFeed = () => {
         };
       });
 
-      setPosts(transformedPosts);
+      // Update pagination state
+      if (metadata) {
+        setCurrentPage(metadata.currentPage || page);
+        setHasNextPage(metadata.hasNext || false);
+        setHasPreviousPage(metadata.hasPrevious || false);
+        setTotalPages(metadata.totalPages || 1);
+        setTotalElements(metadata.totalElements || 0);
+      }
+
+      if (append) {
+        setPosts(prevPosts => [...prevPosts, ...transformedPosts]);
+      } else {
+        setPosts(transformedPosts);
+      }
+      
       setUserReactions(newUserReactions);
       setPollVotesLoaded(false); // Reset poll votes loaded flag when posts are reloaded
       setPollData({}); // Clear poll data when posts are reloaded
@@ -645,13 +748,96 @@ const SocialFeed = () => {
 
   // Handle creating a new post
   const handleCreatePost = async () => {
+    if (!newPostContent.trim() && selectedFiles.length === 0) return;
+
+    setCreatingPost(true);
+    try {
+      const response = await feedApi.createFeedPost({
+        content: newPostContent,
+        type: selectedFiles.length > 0 ? "photo" : "text",
+        files: selectedFiles,
+      });
+
+      if (response.error) {
+        toast({
+          title: "Error",
+          description: response.error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Reload posts to get the new post
+      await loadPosts();
+      setNewPostContent("");
+      setSelectedFiles([]);
+      setFilePreviewUrls([]);
+      toast({
+        title: "Success",
+        description: "Your post has been published successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create post",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingPost(false);
+    }
+  };
+
+  // Handle creating an event post
+  const handleCreateEventPost = async () => {
+    if (!newPostContent.trim() && !eventTitle?.trim()) return;
+
+    setCreatingPost(true);
+    try {
+      const response = await feedApi.createFeedPost({
+        content: newPostContent,
+        type: "event",
+        event_title: eventTitle,
+        event_date: eventDate,
+      });
+
+      if (response.error) {
+        toast({
+          title: "Error",
+          description: response.error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Reload posts to get the new post
+      await loadPosts();
+      setNewPostContent("");
+      setEventTitle("");
+      setEventDate("");
+      toast({
+        title: "Success",
+        description: "Your event has been created successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create event",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingPost(false);
+    }
+  };
+
+  // Handle creating a birthday post
+  const handleCreateBirthdayPost = async () => {
     if (!newPostContent.trim()) return;
 
     setCreatingPost(true);
     try {
       const response = await feedApi.createFeedPost({
         content: newPostContent,
-        type: "text",
+        type: "birthday",
       });
 
       if (response.error) {
@@ -668,17 +854,146 @@ const SocialFeed = () => {
       setNewPostContent("");
       toast({
         title: "Success",
-        description: "Your post has been published successfully",
+        description: "Your birthday post has been created successfully",
       });
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to create post",
+        description: "Failed to create birthday post",
         variant: "destructive",
       });
     } finally {
       setCreatingPost(false);
     }
+  };
+
+  // Handle creating an appreciation post
+  const handleCreateAppreciationPost = async () => {
+    if (!newPostContent.trim()) return;
+
+    setCreatingPost(true);
+    try {
+      const response = await feedApi.createFeedPost({
+        content: newPostContent,
+        type: "appreciation",
+      });
+
+      if (response.error) {
+        toast({
+          title: "Error",
+          description: response.error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Reload posts to get the new post
+      await loadPosts();
+      setNewPostContent("");
+      toast({
+        title: "Success",
+        description: "Your appreciation post has been created successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create appreciation post",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingPost(false);
+    }
+  };
+
+  // Handle creating a highlight post
+  const handleCreateHighlightPost = async () => {
+    if (!newPostContent.trim() && selectedFiles.length === 0) return;
+
+    setCreatingPost(true);
+    try {
+      const response = await feedApi.createFeedPost({
+        content: newPostContent,
+        type: "highlight",
+        files: selectedFiles,
+      });
+
+      if (response.error) {
+        toast({
+          title: "Error",
+          description: response.error,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Reload posts to get the new post
+      await loadPosts();
+      setNewPostContent("");
+      setSelectedFiles([]);
+      setFilePreviewUrls([]);
+      toast({
+        title: "Success",
+        description: "Your highlight post has been created successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create highlight post",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingPost(false);
+    }
+  };
+
+  // File handling functions
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+    
+    if (imageFiles.length === 0) {
+      toast({
+        title: "Invalid file type",
+        description: "Please select only image files",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Limit to 5 images
+    if (selectedFiles.length + imageFiles.length > 5) {
+      toast({
+        title: "Too many images",
+        description: "You can upload a maximum of 5 images",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSelectedFiles(prev => [...prev, ...imageFiles]);
+    
+    // Create preview URLs
+    imageFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setFilePreviewUrls(prev => [...prev, e.target?.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    setFilePreviewUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const clearAllFiles = () => {
+    setSelectedFiles([]);
+    setFilePreviewUrls([]);
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
   };
 
   // Handle adding a comment
@@ -748,6 +1063,10 @@ const SocialFeed = () => {
   // Get icon based on post type
   const getPostTypeIcon = (type: Post["type"]) => {
     switch (type) {
+      case "text":
+        return <MessageCircle className="h-4 w-4 text-blue-500" />;
+      case "photo":
+        return <Image className="h-4 w-4 text-green-500" />;
       case "event":
         return <Calendar className="h-4 w-4 text-blue-500" />;
       case "birthday":
@@ -756,6 +1075,8 @@ const SocialFeed = () => {
         return <Award className="h-4 w-4 text-amber-500" />;
       case "poll":
         return <Vote className="h-4 w-4 text-blue-500" />;
+      case "highlight":
+        return <Star className="h-4 w-4 text-yellow-500" />;
       default:
         return null;
     }
@@ -764,12 +1085,9 @@ const SocialFeed = () => {
   // Filter posts based on active tab
   const getFilteredPosts = () => {
     if (activeTab === "posts") {
-      // Show all posts except events, birthdays, appreciation, and polls
+      // Show text and photo posts in the posts tab
       return posts.filter((post) => 
-        post.type !== "event" && 
-        post.type !== "birthday" && 
-        post.type !== "appreciation" && 
-        post.type !== "poll"
+        post.type === "text" || post.type === "photo"
       );
     }
     
@@ -778,7 +1096,8 @@ const SocialFeed = () => {
       "events": "event",
       "birthdays": "birthday", 
       "appreciation": "appreciation",
-      "polls": "poll"
+      "polls": "poll",
+      "highlights": "highlight"
     };
     
     const postType = tabToTypeMap[activeTab];
@@ -799,7 +1118,7 @@ const SocialFeed = () => {
     }
     // Add new reaction
     const response = await feedApi.addReactionToFeedPost(Number(postId), {
-      user_id: user.id,
+      user_id: Number(user.id),
       reaction_type: reactionType,
     });
     if (response && !response.error) {
@@ -885,7 +1204,7 @@ const SocialFeed = () => {
     if (!user) return;
     // Only add the new reaction
     const response = await feedApi.addReactionToComment(Number(postId), Number(commentId), {
-      user_id: user.id,
+      user_id: Number(user.id),
       reaction_type: reactionType,
     });
     if (response && !response.error) {
@@ -943,6 +1262,12 @@ const SocialFeed = () => {
     setCommentsVisible(prev => ({ ...prev, [postId]: !prev[postId] }));
   };
 
+  // Load more posts function
+  const loadMorePosts = async () => {
+    if (loadingMore || !hasNextPage) return;
+    await loadPosts(currentPage + 1, true);
+  };
+
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto flex items-center justify-center min-h-[400px]">
@@ -967,12 +1292,13 @@ const SocialFeed = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-8">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="posts">Posts</TabsTrigger>
           <TabsTrigger value="events">Events</TabsTrigger>
           <TabsTrigger value="birthdays">Birthdays</TabsTrigger>
           <TabsTrigger value="appreciation">Appreciation</TabsTrigger>
           <TabsTrigger value="polls">Polls</TabsTrigger>
+          <TabsTrigger value="highlights">Highlights</TabsTrigger>
         </TabsList>
         <TabsContent value="posts">
           {/* Create post */}
@@ -999,8 +1325,79 @@ const SocialFeed = () => {
                     className="mb-4 backdrop-blur-sm bg-background/50"
                     disabled={creatingPost}
                   />
-                  <div className="flex justify-end">
-                    <Button onClick={handleCreatePost} disabled={creatingPost}>
+                  
+                  {/* File upload section */}
+                  <div className="mb-4">
+                    {/* File input */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        disabled={creatingPost}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="cursor-pointer"
+                        disabled={creatingPost}
+                        onClick={triggerFileInput}
+                      >
+                        <Image className="h-4 w-4 mr-2" />
+                        Add Images
+                      </Button>
+                      {selectedFiles.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={clearAllFiles}
+                          disabled={creatingPost}
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Clear All
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* File previews */}
+                    {filePreviewUrls.length > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                        {filePreviewUrls.map((url, index) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={url}
+                              alt={`Preview ${index + 1}`}
+                              className="w-full h-24 object-cover rounded-md"
+                            />
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => removeFile(index)}
+                              disabled={creatingPost}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <div className="text-sm text-muted-foreground">
+                      {selectedFiles.length > 0 && `${selectedFiles.length} image(s) selected`}
+                    </div>
+                    <Button 
+                      onClick={handleCreatePost} 
+                      disabled={creatingPost || (!newPostContent.trim() && selectedFiles.length === 0)}
+                    >
                       {creatingPost && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                       Post
                     </Button>
@@ -1039,7 +1436,7 @@ const SocialFeed = () => {
                         <div>
                           <CardTitle className="text-base">
                             {post.author.name}
-                            {post.type !== "post" && (
+                            {post.type !== "text" && post.type !== "photo" && (
                               <Badge variant="outline" className="ml-2 px-2 py-0">
                                 <span className="flex items-center gap-1">
                                   {getPostTypeIcon(post.type)}
@@ -1157,7 +1554,10 @@ const SocialFeed = () => {
                       </div>
                     )}
                     
-                    {post.image && (
+                    {(post.media_urls && post.media_urls.length > 0) && (
+                      <MediaGallery mediaUrls={post.media_urls} />
+                    )}
+                    {(!post.media_urls || post.media_urls.length === 0) && post.image && (
                       <div className="mt-4">
                         <img
                           src={post.image}
@@ -1397,8 +1797,78 @@ const SocialFeed = () => {
           </div>
         </TabsContent>
         
+
+        
         {/* Other tabs content - reuse the same post rendering logic */}
         <TabsContent value="events">
+          {/* Create Event Post */}
+          <Card className="mb-6 backdrop-blur-sm bg-card/50 border-border/50">
+            <CardHeader>
+              <CardTitle className="text-lg">Create Event</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-4">
+                <Avatar>
+                  <AvatarImage src={user?.avatar} alt={user?.name} />
+                  <AvatarFallback>
+                    {user?.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <Textarea
+                    placeholder="What event would you like to share?"
+                    value={newPostContent}
+                    onChange={(e) => setNewPostContent(e.target.value)}
+                    className="mb-4 backdrop-blur-sm bg-background/50"
+                    disabled={creatingPost}
+                  />
+                  
+                  {/* Event Details */}
+                  <div className="space-y-4 mb-4">
+                    <div>
+                      <Label htmlFor="event-title">Event Title</Label>
+                      <Input
+                        id="event-title"
+                        placeholder="Enter event title"
+                        value={eventTitle || ""}
+                        onChange={(e) => setEventTitle(e.target.value)}
+                        className="mt-1"
+                        disabled={creatingPost}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="event-date">Event Date & Time</Label>
+                      <Input
+                        id="event-date"
+                        type="datetime-local"
+                        value={eventDate || ""}
+                        onChange={(e) => setEventDate(e.target.value)}
+                        className="mt-1"
+                        disabled={creatingPost}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <div className="text-sm text-muted-foreground">
+                      Share this event with your team
+                    </div>
+                    <Button 
+                      onClick={handleCreateEventPost} 
+                      disabled={creatingPost || (!newPostContent.trim() && !eventTitle?.trim())}
+                    >
+                      {creatingPost && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Create Event
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="space-y-6">
             {getFilteredPosts().length === 0 ? (
               <Card className="backdrop-blur-sm bg-card/50 border-border/50">
@@ -1462,7 +1932,10 @@ const SocialFeed = () => {
                       </div>
                     )}
                     
-                    {post.image && (
+                    {post.type === "photo" && (post.media_urls && post.media_urls.length > 0) && (
+                      <MediaGallery mediaUrls={post.media_urls} />
+                    )}
+                    {post.type === "photo" && (!post.media_urls || post.media_urls.length === 0) && post.image && (
                       <div className="mt-4">
                         <img
                           src={post.image}
@@ -1699,10 +2172,67 @@ const SocialFeed = () => {
                 </Card>
               ))
             )}
+            
+            {/* Load More Button for Events */}
+            {activeTab === "events" && hasNextPage && (
+              <div className="flex justify-center mt-6">
+                <Button 
+                  onClick={loadMorePosts} 
+                  disabled={loadingMore}
+                  variant="outline"
+                  className="backdrop-blur-sm bg-card/50 border-border/50"
+                >
+                  {loadingMore && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Load More Events
+                </Button>
+              </div>
+            )}
           </div>
         </TabsContent>
         
         <TabsContent value="birthdays">
+          {/* Create Birthday Post */}
+          <Card className="mb-6 backdrop-blur-sm bg-card/50 border-border/50">
+            <CardHeader>
+              <CardTitle className="text-lg">Create Birthday Post</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-4">
+                <Avatar>
+                  <AvatarImage src={user?.avatar} alt={user?.name} />
+                  <AvatarFallback>
+                    {user?.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <Textarea
+                    placeholder="Share a birthday message or celebration..."
+                    value={newPostContent}
+                    onChange={(e) => setNewPostContent(e.target.value)}
+                    className="mb-4 backdrop-blur-sm bg-background/50"
+                    disabled={creatingPost}
+                  />
+                  
+                  <div className="flex justify-between items-center">
+                    <div className="text-sm text-muted-foreground">
+                      Celebrate birthdays with your team 🎉
+                    </div>
+                    <Button 
+                      onClick={handleCreateBirthdayPost} 
+                      disabled={creatingPost || !newPostContent.trim()}
+                    >
+                      {creatingPost && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Create Birthday Post
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="space-y-6">
             {getFilteredPosts().length === 0 ? (
               <Card className="backdrop-blur-sm bg-card/50 border-border/50">
@@ -1985,10 +2515,67 @@ const SocialFeed = () => {
                 </Card>
               ))
             )}
+            
+            {/* Load More Button for Birthdays */}
+            {activeTab === "birthdays" && hasNextPage && (
+              <div className="flex justify-center mt-6">
+                <Button 
+                  onClick={loadMorePosts} 
+                  disabled={loadingMore}
+                  variant="outline"
+                  className="backdrop-blur-sm bg-card/50 border-border/50"
+                >
+                  {loadingMore && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Load More Birthdays
+                </Button>
+              </div>
+            )}
           </div>
         </TabsContent>
         
         <TabsContent value="appreciation">
+          {/* Create Appreciation Post */}
+          <Card className="mb-6 backdrop-blur-sm bg-card/50 border-border/50">
+            <CardHeader>
+              <CardTitle className="text-lg">Create Appreciation Post</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-4">
+                <Avatar>
+                  <AvatarImage src={user?.avatar} alt={user?.name} />
+                  <AvatarFallback>
+                    {user?.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <Textarea
+                    placeholder="Share appreciation, recognition, or achievements..."
+                    value={newPostContent}
+                    onChange={(e) => setNewPostContent(e.target.value)}
+                    className="mb-4 backdrop-blur-sm bg-background/50"
+                    disabled={creatingPost}
+                  />
+                  
+                  <div className="flex justify-between items-center">
+                    <div className="text-sm text-muted-foreground">
+                      Recognize and appreciate your team members 🏆
+                    </div>
+                    <Button 
+                      onClick={handleCreateAppreciationPost} 
+                      disabled={creatingPost || !newPostContent.trim()}
+                    >
+                      {creatingPost && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Create Appreciation Post
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="space-y-6">
             {getFilteredPosts().length === 0 ? (
               <Card className="backdrop-blur-sm bg-card/50 border-border/50">
@@ -2271,6 +2858,21 @@ const SocialFeed = () => {
                 </Card>
               ))
             )}
+            
+            {/* Load More Button for Appreciation */}
+            {activeTab === "appreciation" && hasNextPage && (
+              <div className="flex justify-center mt-6">
+                <Button 
+                  onClick={loadMorePosts} 
+                  disabled={loadingMore}
+                  variant="outline"
+                  className="backdrop-blur-sm bg-card/50 border-border/50"
+                >
+                  {loadingMore && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Load More Appreciation
+                </Button>
+              </div>
+            )}
           </div>
         </TabsContent>
         
@@ -2388,7 +2990,10 @@ const SocialFeed = () => {
                       </div>
                     )}
                     
-                    {post.image && (
+                    {(post.media_urls && post.media_urls.length > 0) && (
+                      <MediaGallery mediaUrls={post.media_urls} />
+                    )}
+                    {(!post.media_urls || post.media_urls.length === 0) && post.image && (
                       <div className="mt-4">
                         <img
                           src={post.image}
@@ -2468,7 +3073,7 @@ const SocialFeed = () => {
                           {getTopReactions(post.reactions).length > 0 && (
                             <span className="flex items-center gap-1">
                               {getTopReactions(post.reactions).slice(0, 3).map((reaction, idx) => (
-                                <span key={idx} className="text-lg">{REACTION_EMOJIS[reaction.reactionType]}</span>
+                                <span key={idx} className="text-lg">{REACTION_EMOJIS[reaction]}</span>
                               ))}
                               <span>{post.reactions.length} reactions</span>
                             </span>
@@ -2600,6 +3205,369 @@ const SocialFeed = () => {
                   </div>
                 </Card>
               ))
+            )}
+            
+            {/* Load More Button for Polls */}
+            {activeTab === "polls" && hasNextPage && (
+              <div className="flex justify-center mt-6">
+                <Button 
+                  onClick={loadMorePosts} 
+                  disabled={loadingMore}
+                  variant="outline"
+                  className="backdrop-blur-sm bg-card/50 border-border/50"
+                >
+                  {loadingMore && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Load More Polls
+                </Button>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+        
+        {/* Highlights Tab */}
+        <TabsContent value="highlights">
+          {/* Create Highlight Post */}
+          <Card className="mb-6 backdrop-blur-sm bg-card/50 border-border/50">
+            <CardHeader>
+              <CardTitle className="text-lg">Create Highlight Post</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-4">
+                <Avatar>
+                  <AvatarImage src={user?.avatar} alt={user?.name} />
+                  <AvatarFallback>
+                    {user?.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <Textarea
+                    placeholder="Share highlights, milestones, or important updates..."
+                    value={newPostContent}
+                    onChange={(e) => setNewPostContent(e.target.value)}
+                    className="mb-4 backdrop-blur-sm bg-background/50"
+                    disabled={creatingPost}
+                  />
+                  
+                  {/* File upload section for highlights */}
+                  <div className="mb-4">
+                    {/* File input */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        disabled={creatingPost}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="cursor-pointer"
+                        disabled={creatingPost}
+                        onClick={triggerFileInput}
+                      >
+                        <Image className="h-4 w-4 mr-2" />
+                        Add Images
+                      </Button>
+                      {selectedFiles.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={clearAllFiles}
+                          disabled={creatingPost}
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Clear All
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* File previews */}
+                    {filePreviewUrls.length > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                        {filePreviewUrls.map((url, index) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={url}
+                              alt={`Preview ${index + 1}`}
+                              className="w-full h-24 object-cover rounded-md"
+                            />
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => removeFile(index)}
+                              disabled={creatingPost}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-between items-center">
+                    <div className="text-sm text-muted-foreground">
+                      {selectedFiles.length > 0 && `${selectedFiles.length} image(s) selected`}
+                    </div>
+                    <Button 
+                      onClick={handleCreateHighlightPost} 
+                      disabled={creatingPost || (!newPostContent.trim() && selectedFiles.length === 0)}
+                    >
+                      {creatingPost && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Create Highlight Post
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-6">
+            {getFilteredPosts().length === 0 ? (
+              <Card className="backdrop-blur-sm bg-card/50 border-border/50">
+                <CardContent className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <Star className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-muted-foreground">No highlights yet.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              getFilteredPosts().map((post) => (
+                <Card key={post.id} className="backdrop-blur-sm bg-card/50 border-border/50">
+                  <CardHeader className="pb-3">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-4">
+                        <Avatar>
+                          <AvatarImage src={post.author.avatar} alt={post.author.name} />
+                          <AvatarFallback>
+                            {post.author.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <CardTitle className="text-base">
+                            {post.author.name}
+                            <Badge variant="outline" className="ml-2 px-2 py-0">
+                              <span className="flex items-center gap-1">
+                                {getPostTypeIcon(post.type)}
+                                {post.type.charAt(0).toUpperCase() + post.type.slice(1)}
+                              </span>
+                            </Badge>
+                          </CardTitle>
+                          <CardDescription>{formatDate(post.timestamp)}</CardDescription>
+                        </div>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pb-3">
+                    <p className="whitespace-pre-line">{post.content}</p>
+                    
+                    {post.type === "photo" && (post.media_urls && post.media_urls.length > 0) && (
+                      <MediaGallery mediaUrls={post.media_urls} />
+                    )}
+                    {post.type === "photo" && (!post.media_urls || post.media_urls.length === 0) && post.image && (
+                      <div className="mt-4">
+                        <img
+                          src={post.image}
+                          alt="Post attachment"
+                          className="rounded-md max-h-96 w-full object-cover"
+                        />
+                      </div>
+                    )}
+                  </CardContent>
+                  <CardFooter className="flex items-center justify-evenly border-t pt-2 mt-2 gap-0 px-0">
+                    {/* Like button with popover for all reactions */}
+                    <Popover open={!!reactionPopoverOpen[post.id]} onOpenChange={open => handlePopoverOpen(post.id, open)}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={`flex-1 flex items-center justify-center px-0 py-2 font-medium transition hover:bg-muted/50`}
+                          onClick={() => {
+                            if (userReactions[post.id]) {
+                              handleRemoveReaction(post.id, userReactions[post.id]!);
+                            } else {
+                              handleAddReaction(post.id, 'like');
+                            }
+                          }}
+                          onMouseEnter={() => handlePopoverOpen(post.id, true)}
+                          onMouseLeave={() => handlePopoverOpen(post.id, false)}
+                          type="button"
+                        >
+                          <div className={`inline-flex items-center justify-center rounded-full min-w-[100px] max-w-[180px] w-auto ${userReactions[post.id] ? 'bg-primary text-primary-foreground' : 'bg-transparent'}`}>
+                            <span className="text-xl mr-1">{REACTION_EMOJIS[userReactions[post.id] || 'like']}</span>
+                            <span>{REACTION_NAMES[userReactions[post.id] || 'like']}</span>
+                          </div>
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-2">
+                        <div className="flex gap-1">
+                          {REACTION_TYPES.map((type) => (
+                            <button
+                              key={type}
+                              className="hover:scale-125 transition-transform p-1 rounded"
+                              onClick={async () => {
+                                const currentReaction = userReactions[post.id];
+                                if (currentReaction === type) {
+                                  await handleRemoveReaction(post.id, type);
+                                } else {
+                                  if (currentReaction) {
+                                    await handleRemoveReaction(post.id, currentReaction);
+                                  }
+                                  await handleAddReaction(post.id, type);
+                                }
+                                handlePopoverOpen(post.id, false);
+                              }}
+                              type="button"
+                            >
+                              {REACTION_EMOJIS[type]}
+                            </button>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="flex-1 flex items-center justify-center px-0 py-2 font-medium transition hover:bg-muted/50"
+                      onClick={() => toggleComments(post.id)}
+                    >
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      {post.comments.length} Comments
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="flex-1 flex items-center justify-center px-0 py-2 font-medium transition hover:bg-muted/50"
+                    >
+                      <Share2 className="h-4 w-4 mr-2" />
+                      Share
+                    </Button>
+                  </CardFooter>
+                  
+                  {/* Comments section */}
+                  {commentsVisible[post.id] && (
+                    <div className="border-t pt-4">
+                      <div className="space-y-4 px-4">
+                        {post.comments.map((comment) => (
+                          <div key={comment.id} className="flex gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={comment.author.avatar} alt={comment.author.name} />
+                              <AvatarFallback>
+                                {comment.author.name
+                                  .split(" ")
+                                  .map((n) => n[0])
+                                  .join("")}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <div className="bg-muted/50 rounded-lg p-3">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="font-medium text-sm">{comment.author.name}</span>
+                                  <span className="text-xs text-muted-foreground">{formatDate(comment.timestamp)}</span>
+                                </div>
+                                <p className="text-sm">{comment.content}</p>
+                              </div>
+                              <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                                <Popover open={!!commentReactionPopoverOpen[`${post.id}_${comment.id}`]} onOpenChange={open => handleCommentReactionPopoverOpen(post.id, comment.id, open)}>
+                                  <PopoverTrigger asChild>
+                                    <button className="hover:text-foreground flex items-center gap-1">
+                                      <span className="text-lg">{REACTION_EMOJIS[userCommentReactions[`${post.id}_${comment.id}`] || 'like']}</span>
+                                      <span>{REACTION_NAMES[userCommentReactions[`${post.id}_${comment.id}`] || 'like']}</span>
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-2">
+                                    <div className="flex gap-1">
+                                      {REACTION_TYPES.map((type) => (
+                                        <button
+                                          key={type}
+                                          className="hover:scale-125 transition-transform p-1 rounded"
+                                          onClick={async () => {
+                                            const key = `${post.id}_${comment.id}`;
+                                            const currentReaction = userCommentReactions[key];
+                                            if (currentReaction === type) {
+                                              await handleRemoveCommentReaction(post.id, comment.id, type);
+                                            } else {
+                                              if (currentReaction) {
+                                                await handleRemoveCommentReaction(post.id, comment.id, currentReaction);
+                                              }
+                                              await handleAddCommentReaction(post.id, comment.id, type);
+                                            }
+                                            handleCommentReactionPopoverOpen(post.id, comment.id, false);
+                                          }}
+                                          type="button"
+                                        >
+                                          {REACTION_EMOJIS[type]}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                                <button className="hover:text-foreground">Reply</button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Add comment */}
+                  <div className="flex gap-3 w-full mt-4 px-4 pb-2">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={user?.avatar} alt={user?.name} />
+                      <AvatarFallback>
+                        {user?.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <Textarea
+                      placeholder="Write a comment..."
+                      value={newComments[post.id] || ""}
+                      onChange={(e) => setNewComments((prev) => ({ ...prev, [post.id]: e.target.value }))}
+                      className="flex-1 resize-none rounded-lg bg-white/80 border border-gray-200 px-3 py-2"
+                      rows={1}
+                    />
+                    <Button
+                      onClick={() => handleAddComment(post.id)}
+                      disabled={!newComments[post.id]?.trim()}
+                      className="rounded-lg px-4 py-2"
+                    >
+                      Comment
+                    </Button>
+                  </div>
+                </Card>
+              ))
+            )}
+            
+            {/* Load More Button for Highlights */}
+            {activeTab === "highlights" && hasNextPage && (
+              <div className="flex justify-center mt-6">
+                <Button 
+                  onClick={loadMorePosts} 
+                  disabled={loadingMore}
+                  variant="outline"
+                  className="backdrop-blur-sm bg-card/50 border-border/50"
+                >
+                  {loadingMore && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Load More Highlights
+                </Button>
+              </div>
             )}
           </div>
         </TabsContent>

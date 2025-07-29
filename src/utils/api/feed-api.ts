@@ -5,9 +5,13 @@ import { API_BASE_URL, getAuthHeaders } from './api-config';
 interface FeedPostRequest {
     content: string;
     type?: string;
-    media_urls?: string[];
     event_date?: string;
     event_title?: string;
+    poll_options?: string[];
+}
+
+interface FeedPostWithFilesRequest extends FeedPostRequest {
+    files?: File[];
 }
 
 interface CommentRequest {
@@ -24,13 +28,35 @@ type ReactionRequest = {
     reaction_type?: string;
 };
 
-export const createFeedPost = async (req: FeedPostRequest) => {
+export const createFeedPost = async (req: FeedPostWithFilesRequest) => {
     const token = localStorage.getItem("teamsync_jwt");
 
     try {
-        const res = await axios.post(`${API_BASE_URL}/feedposts`, req, {
+        // Create FormData for multipart/form-data
+        const formData = new FormData();
+        
+        // Add the feed post data as JSON string
+        const feedPostData = {
+            type: req.type,
+            content: req.content,
+            event_date: req.event_date,
+            event_title: req.event_title,
+            poll_options: req.poll_options,
+        };
+        
+        formData.append('feedPost', JSON.stringify(feedPostData));
+        
+        // Add files if provided
+        if (req.files && req.files.length > 0) {
+            req.files.forEach((file) => {
+                formData.append('files', file);
+            });
+        }
+
+        const res = await axios.post(`${API_BASE_URL}/feedposts`, formData, {
             headers: {
                 Authorization: `Bearer ${token}`,
+                // Don't set Content-Type - let axios set it automatically for FormData
             },
         });
 
@@ -48,11 +74,25 @@ export const createFeedPost = async (req: FeedPostRequest) => {
     }
 }
 
-export const getFeedPosts = async () => {
+// Helper function for creating feed posts without files (backward compatibility)
+export const createFeedPostWithoutFiles = async (req: FeedPostRequest) => {
+    return createFeedPost({ ...req, files: undefined });
+}
+
+export const getFeedPosts = async (page: number = 1, limit: number = 20, type?: string) => {
     const token = localStorage.getItem("teamsync_jwt");
 
     try {
-        const res = await axios.get(`${API_BASE_URL}/feedposts`, {
+        const params = new URLSearchParams({
+            page: page.toString(),
+            limit: limit.toString(),
+        });
+        
+        if (type) {
+            params.append("type", type);
+        }
+
+        const res = await axios.get(`${API_BASE_URL}/feedposts?${params.toString()}`, {
             headers: {
                 Authorization: `Bearer ${token}`,
             },
