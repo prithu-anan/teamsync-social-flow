@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { Outlet, Navigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
+import { Outlet } from "react-router-dom";
 import AppSidebar from "@/components/AppSidebar";
 import Header from "@/components/Header";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -8,7 +7,6 @@ import WaterBackground from '@/components/WaterBackground';
 import FloatingChatbot from '@/components/FloatingChatbot';
 
 const MainLayout = () => {
-  const { isAuthenticated } = useAuth();
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -21,10 +19,6 @@ const MainLayout = () => {
 
     return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" />;
-  }
 
   return (
     <SidebarProvider

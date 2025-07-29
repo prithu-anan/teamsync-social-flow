@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import MainLayout from "./layouts/MainLayout";
+import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import KanbanBoard from "./pages/KanbanBoard";
 import SocialFeed from "./pages/SocialFeed";
@@ -19,6 +20,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import CheckEmail from "./pages/CheckEmail";
 import ResetPassword from "./pages/ResetPassword";
 import Profile from "./pages/Profile";
+import ProtectedRoute from "./components/ProtectedRoute";
 // import Profile from "./pages/Profile";
 
 const queryClient = new QueryClient();
@@ -31,23 +33,79 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/check-email" element={<CheckEmail />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             
-            <Route path="/" element={<MainLayout />}>
+            {/* Protected Routes */}
+            <Route path="/dashboard" element={
+              <ProtectedRoute>
+                <MainLayout />
+              </ProtectedRoute>
+            }>
               <Route index element={<Dashboard />} />
-              <Route path="projects" element={<MyProjects />} />
-              <Route path="kanban" element={<KanbanBoard />} />
-              <Route path="social" element={<SocialFeed />} />
-              <Route path="calendar" element={<Calendar />} />
-              <Route path="messages" element={<Messages />} />
-              <Route path="whiteboard" element={<Whiteboard />} />
-              <Route path="/profile/:userId" element={<Profile />} />
-              {/* <Route path="profile" element={<Profile />} /> */}
             </Route>
+            
+            <Route path="/projects" element={
+              <ProtectedRoute>
+                <MainLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<MyProjects />} />
+            </Route>
+            
+            <Route path="/kanban" element={
+              <ProtectedRoute>
+                <MainLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<KanbanBoard />} />
+            </Route>
+            
+            <Route path="/social" element={
+              <ProtectedRoute>
+                <MainLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<SocialFeed />} />
+            </Route>
+            
+            <Route path="/calendar" element={
+              <ProtectedRoute>
+                <MainLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<Calendar />} />
+            </Route>
+            
+            <Route path="/messages" element={
+              <ProtectedRoute>
+                <MainLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<Messages />} />
+            </Route>
+            
+            <Route path="/whiteboard" element={
+              <ProtectedRoute>
+                <MainLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<Whiteboard />} />
+            </Route>
+            
+            <Route path="/profile/:userId" element={
+              <ProtectedRoute>
+                <MainLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<Profile />} />
+            </Route>
+            
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import TeamSyncLogo from "@/components/TeamSyncLogo";
 import { Button } from "@/components/ui/button";
@@ -17,9 +17,13 @@ const Login = () => {
   const [error, setError] = useState<string | null>(null);
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Get the return URL from location state, or default to dashboard
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/dashboard";
 
   if (isAuthenticated) {
-    navigate("/");
+    navigate(from);
     return null;
   }
 
@@ -36,7 +40,7 @@ const Login = () => {
     setIsLoading(false);
     
     if (success) {
-      navigate("/");
+      navigate(from);
     } else {
       // The AuthContext now handles specific error messages, so we can use a generic message
       // or let the toast handle it entirely. For better UX, we'll show a local error too.
@@ -52,7 +56,7 @@ const Login = () => {
     setIsLoading(false);
     
     if (success) {
-      navigate("/");
+      navigate(from);
     } else {
       setError("Demo login failed. Please try again.");
     }
