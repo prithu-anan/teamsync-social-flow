@@ -94,14 +94,16 @@ const AppSidebar = () => {
     >
       <div className="flex items-center h-16 px-4 border-b border-sidebar-border">
         {!isCollapsed ? (
-          <div className="flex items-center">
+          <NavLink to="/" className="flex items-center hover:opacity-80 transition-opacity">
             <TeamSyncLogo className="h-6 w-6 text-teamsync-400" />
             <span className="ml-2 text-xl font-bold text-sidebar-foreground">
               TeamSync
             </span>
-          </div>
+          </NavLink>
         ) : (
-          <TeamSyncLogo className="h-8 w-8 mx-auto text-teamsync-400" />
+          <NavLink to="/" className="flex items-center justify-center hover:opacity-80 transition-opacity">
+            <TeamSyncLogo className="h-8 w-8 text-teamsync-400" />
+          </NavLink>
         )}
         <SidebarTrigger
           className={cn(

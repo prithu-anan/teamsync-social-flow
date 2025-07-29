@@ -20,6 +20,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import CheckEmail from "./pages/CheckEmail";
 import ResetPassword from "./pages/ResetPassword";
 import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
 import ProtectedRoute from "./components/ProtectedRoute";
 // import Profile from "./pages/Profile";
 
@@ -96,6 +97,14 @@ const App = () => (
               </ProtectedRoute>
             }>
               <Route index element={<Whiteboard />} />
+            </Route>
+            
+            <Route path="/settings" element={
+              <ProtectedRoute>
+                <MainLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<Settings />} />
             </Route>
             
             <Route path="/profile/:userId" element={

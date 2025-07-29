@@ -58,14 +58,35 @@ export const getMe = async () => {
   }
 };
 
-export const updateMe = async (req) => {
+export const updateMe = async (req, file = null) => {
     const token = localStorage.getItem("teamsync_jwt");
 
     try {
-        const res = await axios.post(`${API_BASE_URL}/auth/me`, req, {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
+        let requestData;
+        let headers = {
+            Authorization: `Bearer ${token}`,
+        };
+
+        if (file) {
+            // Create FormData for multipart form
+            const formData = new FormData();
+            
+            // Add user data as JSON string
+            formData.append('user', JSON.stringify(req));
+            
+            // Add file
+            formData.append('file', file);
+            
+            requestData = formData;
+            // Don't set Content-Type header - let browser set it with boundary for multipart
+        } else {
+            // Send as JSON for text-only updates
+            requestData = req;
+            headers['Content-Type'] = 'application/json';
+        }
+
+        const res = await axios.post(`${API_BASE_URL}/auth/me`, requestData, {
+            headers,
         });
 
         if (res.status === 200) {
@@ -74,6 +95,10 @@ export const updateMe = async (req) => {
     } catch (err) {
         if (err.response) {
             return { error: err.response.data || "Failed to update profile" };
+        } else if (err.request) {
+            return { error: "No response from server. Check your connection." };
+        } else {
+            return { error: "An unexpected error occurred." };
         }
     }
 }
@@ -122,7 +147,7 @@ export const changePassword = async (req) => {
     const token = localStorage.getItem("teamsync_jwt");
 
     try {
-        const res = await axios.post(`${API_BASE_URL}/auth/change-password`, req, {
+        const res = await axios.post(`${API_BASE_URL}/auth/password-change`, req, {
             headers: {
                 Authorization: `Bearer ${token}`,
             },

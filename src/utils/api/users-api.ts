@@ -65,13 +65,30 @@ export const getUserById = async (id) => {
     }
 }
 
-export const updateUser = async (id, req) => {
+export const updateUser = async (req, file = null) => {
     const token = localStorage.getItem("teamsync_jwt");
 
     try {
-        const res = await axios.put(`${API_BASE_URL}/users/${id}`, { name: req.name, email: req.email, password: req.password }, {
+        // Create FormData for multipart form
+        const formData = new FormData();
+        
+        // Add user data as JSON string - only include supported fields
+        const userData = {
+            name: req.name,
+            ...(req.birthdate && { birthdate: req.birthdate })
+        };
+        
+        formData.append('user', JSON.stringify(userData));
+        
+        // Add file if provided
+        if (file) {
+            formData.append('file', file);
+        }
+
+        const res = await axios.put(`${API_BASE_URL}/users`, formData, {
             headers: {
                 Authorization: `Bearer ${token}`,
+                // Don't set Content-Type header - let browser set it with boundary for multipart
             },
         });
 
@@ -81,6 +98,10 @@ export const updateUser = async (id, req) => {
     } catch (err) {
         if (err.response) {
             return { error: err.response.data || "Failed to update user" };
+        } else if (err.request) {
+            return { error: "No response from server. Check your connection." };
+        } else {
+            return { error: "An unexpected error occurred." };
         }
     }
 }
