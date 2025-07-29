@@ -53,9 +53,10 @@ interface CreateTaskDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onTaskCreated: () => void;
+  preSelectedProject?: string;
 }
 
-const CreateTaskDialog = ({ open, onOpenChange, onTaskCreated }: CreateTaskDialogProps) => {
+const CreateTaskDialog = ({ open, onOpenChange, onTaskCreated, preSelectedProject }: CreateTaskDialogProps) => {
   const { user } = useAuth();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -81,14 +82,47 @@ const CreateTaskDialog = ({ open, onOpenChange, onTaskCreated }: CreateTaskDialo
         if (response && !response.error) {
           const projectsData = response.data || response;
           if (Array.isArray(projectsData)) {
-            // Filter projects to only show those created by the current user
+            // Filter projects to include those where user is a member OR projects created by the user
             const userProjects = projectsData.filter(project => 
-              project.created_by === user?.id || project.created_by === parseInt(user?.id)
+              // User is a member of the project
+              (Array.isArray(project.members) && project.members.some(m => m.user_id?.toString() === user?.id?.toString())) ||
+              // OR user created the project (check created_by field)
+              (project.created_by?.toString() === user?.id?.toString()) ||
+              // OR user is the creator (check creator_id field)
+              (project.creator_id?.toString() === user?.id?.toString())
             );
-            console.log('All projects:', projectsData);
-            console.log('User projects:', userProjects);
-            console.log('Current user ID:', user?.id);
+
+            
             setProjects(userProjects);
+            
+            // Set pre-selected project if provided and project exists in user's projects
+            if (preSelectedProject && open) {
+              const projectExists = userProjects.some(project => 
+                project.id.toString() === preSelectedProject || 
+                project.id === parseInt(preSelectedProject)
+              );
+              if (projectExists) {
+                setSelectedProject(preSelectedProject);
+              } else {
+                // If project doesn't exist in user projects, check if it exists in all projects
+                const projectInAllProjects = projectsData.some(project => 
+                  project.id.toString() === preSelectedProject || 
+                  project.id === parseInt(preSelectedProject)
+                );
+                // If it exists in all projects but not user projects, we might need to add it
+                if (projectInAllProjects) {
+                  // Find the project in all projects and add it to user projects
+                  const projectToAdd = projectsData.find(project => 
+                    project.id.toString() === preSelectedProject || 
+                    project.id === parseInt(preSelectedProject)
+                  );
+                  if (projectToAdd) {
+                    setProjects([...userProjects, projectToAdd]);
+                    setSelectedProject(preSelectedProject);
+                  }
+                }
+              }
+            }
           }
         }
       } catch (error) {
@@ -99,7 +133,21 @@ const CreateTaskDialog = ({ open, onOpenChange, onTaskCreated }: CreateTaskDialo
     if (open) {
       fetchProjects();
     }
-  }, [open, user?.id]);
+  }, [open, user?.id, preSelectedProject]);
+
+  // Set pre-selected project after projects are loaded
+  useEffect(() => {
+    if (preSelectedProject && projects.length > 0 && open) {
+      // Try both string and number comparison
+      const projectExists = projects.some(project => 
+        project.id.toString() === preSelectedProject || 
+        project.id === parseInt(preSelectedProject)
+      );
+      if (projectExists) {
+        setSelectedProject(preSelectedProject);
+      }
+    }
+  }, [preSelectedProject, projects, open, selectedProject]);
 
   // Fetch project members when project is selected
   useEffect(() => {
@@ -429,7 +477,6 @@ const CreateTaskDialog = ({ open, onOpenChange, onTaskCreated }: CreateTaskDialo
           <div>
             <Label htmlFor="project">Project *</Label>
             <Select value={selectedProject} onValueChange={(value) => {
-              console.log('Selected project:', value);
               setSelectedProject(value);
             }}>
               <SelectTrigger className="mt-1">
@@ -442,7 +489,7 @@ const CreateTaskDialog = ({ open, onOpenChange, onTaskCreated }: CreateTaskDialo
                   </SelectItem>
                 ) : (
                   projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
+                    <SelectItem key={project.id} value={project.id.toString()}>
                       {project.title}
                     </SelectItem>
                   ))

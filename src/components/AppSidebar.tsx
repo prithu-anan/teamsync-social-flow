@@ -40,7 +40,7 @@ const AppSidebar = () => {
         {
           title: "Dashboard",
           icon: LayoutDashboard,
-          path: "/",
+          path: "/dashboard",
         },
         {
           title: "My Projects",
@@ -67,6 +67,11 @@ const AppSidebar = () => {
           icon: Calendar,
           path: "/calendar",
         },
+        {
+          title: "Messages",
+          icon: MessageCircle,
+          path: "/messages",
+        }
       ],
     },
   ];
@@ -141,22 +146,14 @@ const AppSidebar = () => {
       {/* Bottom items */}
       <div className="mt-auto p-2 border-t border-sidebar-border">
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <NavLink to="/messages" className={getLinkClass}>
-                <MessageCircle className={cn("h-5 w-5", isCollapsed && "h-6 w-6 mx-auto")} />
-                {!isCollapsed && <span>Messages</span>}
-              </NavLink>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
+          {/* <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <NavLink to="/notifications" className={getLinkClass}>
                 <Bell className={cn("h-5 w-5", isCollapsed && "h-6 w-6 mx-auto")} />
                 {!isCollapsed && <span>Notifications</span>}
               </NavLink>
             </SidebarMenuButton>
-          </SidebarMenuItem>
+          </SidebarMenuItem> */}
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <NavLink to="/whiteboard" className={getLinkClass}>

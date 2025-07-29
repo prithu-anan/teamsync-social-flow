@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { searchUsers, searchProjects } from "@/utils/api/search-api";
 import { filterAndSortResults, quickFilter } from "@/utils/search-utils";
+import CreateTaskDialog from "@/components/CreateTaskDialog";
 
 interface SearchUser {
   id: string;
@@ -43,6 +44,7 @@ const Header = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [hasLoadedData, setHasLoadedData] = useState(false);
+  const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
   // Load all users and projects once for client-side filtering
@@ -145,6 +147,11 @@ const Header = () => {
     navigate(`/kanban?projectId=${projectId}`);
     setShowResults(false);
     setSearchQuery("");
+  };
+
+  const handleTaskCreated = () => {
+    // Refresh the current page or navigate to kanban board
+    navigate('/kanban');
   };
 
   return (
@@ -254,7 +261,7 @@ const Header = () => {
             <Bell className="h-4 w-4" />
           </Button>
 
-          <Button size="sm" className="hidden md:flex">
+          <Button size="sm" className="hidden md:flex" onClick={() => setCreateTaskDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             New Task
           </Button>
@@ -302,6 +309,13 @@ const Header = () => {
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Create Task Dialog */}
+      <CreateTaskDialog
+        open={createTaskDialogOpen}
+        onOpenChange={setCreateTaskDialogOpen}
+        onTaskCreated={handleTaskCreated}
+      />
     </header>
   );
 };

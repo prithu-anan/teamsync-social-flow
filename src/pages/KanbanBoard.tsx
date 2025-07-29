@@ -671,6 +671,7 @@ const KanbanBoard = () => {
         open={createTaskDialogOpen}
         onOpenChange={setCreateTaskDialogOpen}
         onTaskCreated={fetchTasks}
+        preSelectedProject={projectId}
       />
 
       {/* Edit Task Dialog */}
