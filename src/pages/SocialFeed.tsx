@@ -352,6 +352,7 @@ const SocialFeed = () => {
       const response = await feedApi.createFeedPost({
         type: "poll",
         content: pollQuestion,
+        event_date: new Date().toISOString().split('T')[0], // Current date as default
         poll_options: pollOptions.filter(option => option.trim()),
       });
 
@@ -755,6 +756,8 @@ const SocialFeed = () => {
       const response = await feedApi.createFeedPost({
         content: newPostContent,
         type: selectedFiles.length > 0 ? "photo" : "text",
+        event_date: new Date().toISOString().split('T')[0], // Current date as default
+        poll_options: [], // Empty array for non-poll posts
         files: selectedFiles,
       });
 
@@ -796,8 +799,8 @@ const SocialFeed = () => {
       const response = await feedApi.createFeedPost({
         content: newPostContent,
         type: "event",
-        event_title: eventTitle,
-        event_date: eventDate,
+        event_date: eventDate || new Date().toISOString().split('T')[0], // Use provided date or current date
+        poll_options: [], // Empty array for non-poll posts
       });
 
       if (response.error) {
@@ -838,6 +841,8 @@ const SocialFeed = () => {
       const response = await feedApi.createFeedPost({
         content: newPostContent,
         type: "birthday",
+        event_date: new Date().toISOString().split('T')[0], // Current date as default
+        poll_options: [], // Empty array for non-poll posts
       });
 
       if (response.error) {
@@ -876,6 +881,8 @@ const SocialFeed = () => {
       const response = await feedApi.createFeedPost({
         content: newPostContent,
         type: "appreciation",
+        event_date: new Date().toISOString().split('T')[0], // Current date as default
+        poll_options: [], // Empty array for non-poll posts
       });
 
       if (response.error) {
@@ -914,6 +921,8 @@ const SocialFeed = () => {
       const response = await feedApi.createFeedPost({
         content: newPostContent,
         type: "highlight",
+        event_date: new Date().toISOString().split('T')[0], // Current date as default
+        poll_options: [], // Empty array for non-poll posts
         files: selectedFiles,
       });
 

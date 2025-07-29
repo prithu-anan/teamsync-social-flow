@@ -411,7 +411,7 @@ const Messages = () => {
       // Update payload to match new API: only channel_id, recipient_id, content
       const updatePayload = {
         channel_id: selectedChannel?.channel_id ? parseInt(selectedChannel.channel_id, 10) : null,
-        recipient_id: messageToEdit.recipient_id ? parseInt(messageToEdit.recipient_id, 10) : null,
+        recipient_id: messageToEdit.thread_parent_id ? 1 : (messageToEdit.recipient_id ? parseInt(messageToEdit.recipient_id, 10) : null),
         content: msg.content,
         thread_parent_id: extractNumericId(messageToEdit.thread_parent_id),
       };
@@ -486,7 +486,7 @@ const Messages = () => {
             response = await sendFileMessage(selectedChannel.channel_id, {
               files: msg.files,
               content: msg.content || '',
-              recipient_id: selectedChannel.recipient_id || null,
+              recipient_id: msg.thread_parent_id ? 1 : (selectedChannel.recipient_id || null),
               thread_parent_id: extractNumericId(msg.thread_parent_id)
             });
           } else {
@@ -499,7 +499,7 @@ const Messages = () => {
             
             response = await sendMessage(selectedChannel.channel_id, { 
               content: msg.content.trim(),
-              recipient_id: selectedChannel.recipient_id || null,
+              recipient_id: msg.thread_parent_id ? 1 : (selectedChannel.recipient_id || null),
               thread_parent_id: extractNumericId(msg.thread_parent_id)
             });
           }
@@ -598,13 +598,16 @@ const Messages = () => {
   };
 
   // Helper function to extract numeric ID from message ID (handles both "msg-123" and "123" formats)
-  const extractNumericId = (id: string | null): string | null => {
+  const extractNumericId = (id: string | null): number | null => {
     if (!id) return null;
     // If the ID starts with "msg-", extract the numeric part
+    let numericId = id;
     if (id.startsWith('msg-')) {
-      return id.substring(4); // Remove "msg-" prefix
+      numericId = id.substring(4); // Remove "msg-" prefix
     }
-    return id;
+    // Convert to integer
+    const parsed = parseInt(numericId, 10);
+    return isNaN(parsed) ? null : parsed;
   };
 
   // Fallback demo data for when API is not available
