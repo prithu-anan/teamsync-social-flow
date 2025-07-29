@@ -486,7 +486,7 @@ const Messages = () => {
             response = await sendFileMessage(selectedChannel.channel_id, {
               files: msg.files,
               content: msg.content || '',
-              recipient_id: msg.thread_parent_id ? 1 : (selectedChannel.recipient_id || null),
+              recipient_id: 1,
               thread_parent_id: extractNumericId(msg.thread_parent_id)
             });
           } else {
@@ -499,7 +499,7 @@ const Messages = () => {
             
             response = await sendMessage(selectedChannel.channel_id, { 
               content: msg.content.trim(),
-              recipient_id: msg.thread_parent_id ? 1 : (selectedChannel.recipient_id || null),
+              recipient_id: 1,
               thread_parent_id: extractNumericId(msg.thread_parent_id)
             });
           }
