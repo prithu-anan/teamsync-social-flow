@@ -131,4 +131,26 @@ export const getTaskById = async (taskId) => {
             return { error: "An unexpected error occurred." };
         }
     }
-} 
+}
+
+export const getUserInvolvedTasks = async () => {
+    const token = localStorage.getItem("teamsync_jwt");
+    try {
+        const res = await axios.get(`${API_BASE_URL}/tasks/user/involved`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+        if (res.status === 200) {
+            return res.data;
+        }
+    } catch (err) {
+        if (err.response) {
+            return { error: err.response.data || "Failed to fetch user involved tasks" };
+        } else if (err.request) {
+            return { error: "No response from server. Check your connection." };
+        } else {
+            return { error: "An unexpected error occurred." };
+        }
+    }
+}

@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { getUserTasks } from "@/utils/api/tasks-api";
+import { getUserInvolvedTasks } from "@/utils/api/tasks-api";
 import { getProjects, getProjectTasks } from "@/utils/api/projects-api";
 import { getUserById } from "@/utils/api/users-api";
 import { getEvents } from "@/utils/api/events-api";
@@ -125,7 +125,7 @@ const Dashboard = () => {
         return;
       }
       try {
-        const response = await getUserTasks(user.id);
+        const response = await getUserInvolvedTasks();
         if (response && !response.error) {
           const tasksData = response.tasks || response.data || response;
           if (Array.isArray(tasksData)) {

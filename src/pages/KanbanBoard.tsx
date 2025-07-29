@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { getKanbanTasks, getProjectById } from "@/utils/api/projects-api";
-import { getUserTasks, updateTask, deleteTask } from "@/utils/api/tasks-api";
+import { getUserInvolvedTasks, updateTask, deleteTask } from "@/utils/api/tasks-api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "@/components/ui/use-toast";
@@ -127,7 +127,7 @@ const KanbanBoard = () => {
           return;
         }
         
-        response = await getUserTasks(userId);
+        response = await getUserInvolvedTasks();
       }
       
       if (response.error) {
