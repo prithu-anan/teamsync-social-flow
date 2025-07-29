@@ -14,11 +14,32 @@ interface ThreadModalProps {
   onClose: () => void;
 }
 
+// Helper function to recursively get all parent messages
+const getParentMessages = (message: Message, allMessages: Message[]): Message[] => {
+  const parents: Message[] = [];
+  let currentMessage = message;
+  
+  while (currentMessage.thread_parent_id) {
+    const parent = allMessages.find(m => m.id === currentMessage.thread_parent_id);
+    if (parent) {
+      parents.unshift(parent); // Add to beginning to maintain chronological order
+      currentMessage = parent;
+    } else {
+      break; // Stop if parent not found
+    }
+  }
+  
+  return parents;
+};
+
 const ThreadModal = ({ threadMessage, channel, allMessages, sendMessage, onClose }: ThreadModalProps) => {
   const [reply, setReply] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const replies = allMessages.filter(m => m.thread_parent_id === threadMessage.id);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Get all parent messages recursively
+  const parentMessages = getParentMessages(threadMessage, allMessages);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -51,8 +72,32 @@ const ThreadModal = ({ threadMessage, channel, allMessages, sendMessage, onClose
           <div className="font-semibold">Thread</div>
           <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
         </div>
+        
+        {/* Parent messages chain */}
+        {parentMessages.length > 0 && (
+          <div className="p-4 border-b border-border bg-muted/20">
+            <div className="text-xs text-muted-foreground mb-2">Thread history:</div>
+            <div className="space-y-2">
+              {parentMessages.map((parentMsg, index) => (
+                <div key={parentMsg.id} className="border-l-2 border-blue-200 pl-3">
+                  <MessageItem 
+                    message={parentMsg} 
+                    onReply={() => {}} 
+                    onPin={() => {}} 
+                    isPinned={false}
+                    onEdit={() => {}}
+                    onDelete={() => {}}
+                    onOpenThread={undefined} // Hide "View Thread" button for parent messages
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
         {/* Original message that started the thread */}
         <div className="p-4 border-b border-border bg-muted/30">
+          <div className="text-xs text-muted-foreground mb-2">Original message:</div>
           <MessageItem 
             message={threadMessage} 
             onReply={() => {}} 
@@ -60,11 +105,16 @@ const ThreadModal = ({ threadMessage, channel, allMessages, sendMessage, onClose
             isPinned={false}
             onEdit={() => {}}
             onDelete={() => {}}
+            onOpenThread={undefined} // Hide "View Thread" button for the original message
           />
         </div>
+        
         {/* Replies */}
         <ScrollArea className="flex-1 min-h-0">
           <div className="p-4 space-y-4">
+            {replies.length > 0 && (
+              <div className="text-xs text-muted-foreground mb-2">Replies:</div>
+            )}
             {replies.map(msg => (
               <MessageItem 
                 key={msg.id} 
@@ -74,11 +124,13 @@ const ThreadModal = ({ threadMessage, channel, allMessages, sendMessage, onClose
                 isPinned={false}
                 onEdit={() => {}}
                 onDelete={() => {}}
+                onOpenThread={undefined} // Hide "View Thread" button for replies
               />
             ))}
             <div ref={scrollRef} />
           </div>
         </ScrollArea>
+        
         {/* Input */}
         <div className="border-t border-border p-3 flex items-end gap-2 bg-background">
           <Button variant="ghost" size="icon" onClick={() => fileInputRef.current?.click()}>

@@ -245,7 +245,7 @@ const MessageItem = ({
           )}
 
           {/* Thread replies indicator */}
-          {message.thread_parent_id && (
+          {message.thread_parent_id && onOpenThread && (
             <Button variant="ghost" size="sm" className="mt-2 text-xs text-blue-600 hover:text-blue-800" onClick={onOpenThread}>
               View thread →
             </Button>

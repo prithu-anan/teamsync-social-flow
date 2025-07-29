@@ -51,12 +51,17 @@ export const createFeedPost = async (req: FeedPostWithFilesRequest) => {
             });
         }
 
-        const res = await axios.post(`${API_BASE_URL}/feedposts`, formData, {
+        const options = {
+            method: 'POST',
+            url: `${API_BASE_URL}/feedposts`,
             headers: {
-                Authorization: `Bearer ${token}`,
-                // Don't set Content-Type - let axios set it automatically for FormData
+                authorization: `Bearer ${token}`,
+                'content-type': 'multipart/form-data; boundary=---011000010111000001101001'
             },
-        });
+            data: formData
+        };
+
+        const res = await axios.request(options);
 
         if (res.status === 200 || res.status === 201) {
             return res.data;
