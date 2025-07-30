@@ -12,12 +12,13 @@ import { getEvents, createEvent } from "@/utils/api/events-api";
 import { getUsers } from "@/utils/api/users-api";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { toast } from "@/components/ui/use-toast";
 
 interface Event {
   id: string;
   title: string;
   time: string;
-  type: 'meeting' | 'task' | 'birthday' | 'event';
+  type: 'Outing' | 'Birthday' | 'Workiversary';
   participants?: string[];
 }
 
@@ -25,7 +26,7 @@ const CalendarViews = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [addEventOpen, setAddEventOpen] = useState(false);
-  const [newEvent, setNewEvent] = useState({ title: '', description: '', date: '', type: 'meeting', participants: [] });
+  const [newEvent, setNewEvent] = useState({ title: '', description: '', date: '', type: 'Outing', participants: [] });
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState([]);
@@ -121,16 +122,26 @@ const CalendarViews = () => {
       title: newEvent.title,
       description: newEvent.description,
       date: newEvent.date,
-      type: newEvent.type.toLowerCase(),
+      type: newEvent.type,
       // Handle empty array case - send null or empty array based on backend preference
       participant_ids: newEvent.participants.length > 0 ? newEvent.participants.map(Number) : [],
     };
     const res = await createEvent(eventData);
     if (!res.error) {
       setAddEventOpen(false);
-      setNewEvent({ title: '', description: '', date: '', type: 'meeting', participants: [] });
+      setNewEvent({ title: '', description: '', date: '', type: 'Outing', participants: [] });
+      toast({
+        title: "Event created successfully",
+        description: `${newEvent.title} has been added to your calendar.`,
+      });
       // Optionally refetch events
       // ...
+    } else {
+      toast({
+        title: "Error creating event",
+        description: res.error || "Failed to create event. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -215,10 +226,9 @@ const CalendarViews = () => {
                   <span className="capitalize">{newEvent.type}</span>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="meeting">Meeting</SelectItem>
-                  <SelectItem value="task">Task</SelectItem>
-                  <SelectItem value="birthday">Birthday</SelectItem>
-                  <SelectItem value="event">Event</SelectItem>
+                  <SelectItem value="Outing">Outing</SelectItem>
+                  <SelectItem value="Birthday">Birthday</SelectItem>
+                  <SelectItem value="Workiversary">Workiversary</SelectItem>
                 </SelectContent>
               </Select>
               {/* Member selection dropdown */}
@@ -289,7 +299,7 @@ const CalendarViews = () => {
                 {upcomingEvents.map((event) => (
                   <Card key={event.id} className="p-2 flex items-center justify-between backdrop-blur-sm bg-card/50 border-border/50">
                     <span className="font-medium text-sm">{event.title}</span>
-                    <Badge variant={event.type === 'birthday' ? 'destructive' : 'outline'}>{event.type}</Badge>
+                    <Badge variant={event.type === 'Birthday' ? 'destructive' : 'outline'}>{event.type}</Badge>
                   </Card>
                 ))}
               </div>
@@ -391,7 +401,7 @@ const CalendarViews = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant={event.type === 'birthday' ? 'destructive' : 'outline'}>
+                    <Badge variant={event.type === 'Birthday' ? 'destructive' : 'outline'}>
                       {event.type}
                     </Badge>
                     {event.participants && (
