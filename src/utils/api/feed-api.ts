@@ -36,15 +36,23 @@ export const createFeedPost = async (req: FeedPostWithFilesRequest) => {
         // Create FormData for multipart/form-data
         const formData = new FormData();
         
-        // Add the feed post data as JSON string
-        const feedPostData = {
+        // Build feed post data based on post type
+        const feedPostData: any = {
             type: req.type,
             content: req.content,
-            event_date: req.event_date,
-            poll_options: req.poll_options,
         };
+
+        // Add event_date only for event posts
+        if (req.type === "event" && req.event_date) {
+            feedPostData.event_date = req.event_date;
+        }
+
+        // Add poll_options only for poll posts
+        if (req.type === "poll" && req.poll_options) {
+            feedPostData.poll_options = req.poll_options;
+        }
         
-        formData.append('feedPost', JSON.stringify(feedPostData));
+        formData.append('feedPost', new Blob([JSON.stringify(feedPostData)], { type: 'application/json' }));
         
         // Add files if provided
         if (req.files && req.files.length > 0) {
@@ -58,7 +66,7 @@ export const createFeedPost = async (req: FeedPostWithFilesRequest) => {
             url: `${API_BASE_URL}/feedposts`,
             headers: {
                 authorization: `Bearer ${token}`,
-                'content-type': 'multipart/form-data; boundary=---011000010111000001101001'
+                // 'content-type': 'multipart/form-data; boundary=---011000010111000001101001'
             },
             data: formData
         };
