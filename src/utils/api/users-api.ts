@@ -78,7 +78,7 @@ export const updateUser = async (req, file = null) => {
             ...(req.birthdate && { birthdate: req.birthdate })
         };
         
-        formData.append('user', JSON.stringify(userData));
+        formData.append('user', new Blob([JSON.stringify(userData)], { type: 'application/json' }));
         
         // Add file if provided
         if (file) {
