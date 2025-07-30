@@ -4126,8 +4126,8 @@ const SocialFeed = () => {
 
       {/* Photo Modal */}
       <Dialog open={photoModalOpen} onOpenChange={setPhotoModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] p-0 bg-black/95">
-          <div className="relative w-full h-full flex items-center justify-center">
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0 bg-black/95 overflow-hidden">
+          <div className="relative w-full h-full flex items-center justify-center min-h-0">
             {/* Close button */}
             <Button
               variant="ghost"
@@ -4164,11 +4164,12 @@ const SocialFeed = () => {
 
             {/* Photo */}
             {selectedPhoto && (
-              <div className="flex items-center justify-center w-full h-full p-4">
+              <div className="flex items-center justify-center w-full h-full p-4 min-h-0">
                 <img
                   src={selectedPhoto}
                   alt="Enlarged photo"
-                  className="max-w-full max-h-full object-contain"
+                  className="max-w-full max-h-full object-contain w-auto h-auto"
+                  style={{ maxHeight: 'calc(90vh - 8rem)' }}
                 />
               </div>
             )}
