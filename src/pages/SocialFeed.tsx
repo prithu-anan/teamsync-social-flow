@@ -128,6 +128,7 @@ const SocialFeed = () => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [filePreviewUrls, setFilePreviewUrls] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const appreciationFileInputRef = useRef<HTMLInputElement>(null);
   const [newComments, setNewComments] = useState<Record<string, string>>({});
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
@@ -896,7 +897,7 @@ const SocialFeed = () => {
 
   // Handle creating an appreciation post
   const handleCreateAppreciationPost = async () => {
-    if (!newPostContent.trim()) return;
+    if (!newPostContent.trim() && selectedFiles.length === 0) return;
 
     setCreatingPost(true);
     try {
@@ -905,6 +906,7 @@ const SocialFeed = () => {
         type: "appreciation",
         event_date: new Date().toISOString().split('T')[0], // Current date as default
         poll_options: [], // Empty array for non-poll posts
+        files: selectedFiles,
       });
 
       if (response.error) {
@@ -919,6 +921,8 @@ const SocialFeed = () => {
       // Reload posts to get the new post
       await loadPosts();
       setNewPostContent("");
+      setSelectedFiles([]);
+      setFilePreviewUrls([]);
       toast({
         title: "Success",
         description: "Your appreciation post has been created successfully",
@@ -1025,6 +1029,10 @@ const SocialFeed = () => {
 
   const triggerFileInput = () => {
     fileInputRef.current?.click();
+  };
+
+  const triggerAppreciationFileInput = () => {
+    appreciationFileInputRef.current?.click();
   };
 
   // Handle adding a comment
@@ -2173,13 +2181,13 @@ const SocialFeed = () => {
                       </div>
                     )}
                     
-                    {post.type === "photo" && (post.media_urls && post.media_urls.length > 0) && (
+                    {(post.media_urls && post.media_urls.length > 0) && (
                       <MediaGallery 
                         mediaUrls={post.media_urls} 
                         onPhotoClick={handlePhotoClick}
                       />
                     )}
-                    {post.type === "photo" && (!post.media_urls || post.media_urls.length === 0) && post.image && (
+                    {(!post.media_urls || post.media_urls.length === 0) && post.image && (
                       <div className="mt-4">
                         <img
                           src={post.image}
@@ -2521,6 +2529,23 @@ const SocialFeed = () => {
                   <CardContent className="pb-3">
                     <p className="whitespace-pre-line">{post.content}</p>
                     
+                    {(post.media_urls && post.media_urls.length > 0) && (
+                      <MediaGallery 
+                        mediaUrls={post.media_urls} 
+                        onPhotoClick={handlePhotoClick}
+                      />
+                    )}
+                    {(!post.media_urls || post.media_urls.length === 0) && post.image && (
+                      <div className="mt-4">
+                        <img
+                          src={post.image}
+                          alt="Post attachment"
+                          className="rounded-md max-h-96 w-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => handlePhotoClick(post.image!, 0, [post.image!])}
+                        />
+                      </div>
+                    )}
+                    
                     <div className="mt-4 p-4 bg-pink-50 backdrop-blur-sm rounded-md">
                       <div className="flex items-center gap-3">
                         <Cake className="h-8 w-8 text-pink-500" />
@@ -2804,13 +2829,78 @@ const SocialFeed = () => {
                     disabled={creatingPost}
                   />
                   
+                  {/* File upload section */}
+                  <div className="mb-4">
+                    {/* File input */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <input
+                        ref={appreciationFileInputRef}
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        disabled={creatingPost}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="cursor-pointer"
+                        disabled={creatingPost}
+                        onClick={triggerAppreciationFileInput}
+                      >
+                        <Image className="h-4 w-4 mr-2" />
+                        Add Images
+                      </Button>
+                      {selectedFiles.length > 0 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={clearAllFiles}
+                          disabled={creatingPost}
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Clear All
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* File previews */}
+                    {filePreviewUrls.length > 0 && (
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                        {filePreviewUrls.map((url, index) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={url}
+                              alt={`Preview ${index + 1}`}
+                              className="w-full h-24 object-cover rounded-md"
+                            />
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => removeFile(index)}
+                              disabled={creatingPost}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  
                   <div className="flex justify-between items-center">
                     <div className="text-sm text-muted-foreground">
-                      Recognize and appreciate your team members 🏆
+                      {selectedFiles.length > 0 && `${selectedFiles.length} image(s) selected`}
+                      {selectedFiles.length === 0 && "Recognize and appreciate your team members 🏆"}
                     </div>
                     <Button 
                       onClick={handleCreateAppreciationPost} 
-                      disabled={creatingPost || !newPostContent.trim()}
+                      disabled={creatingPost || (!newPostContent.trim() && selectedFiles.length === 0)}
                     >
                       {creatingPost && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                       Create Appreciation Post
@@ -2863,6 +2953,23 @@ const SocialFeed = () => {
                   </CardHeader>
                   <CardContent className="pb-3">
                     <p className="whitespace-pre-line">{post.content}</p>
+                    
+                    {(post.media_urls && post.media_urls.length > 0) && (
+                      <MediaGallery 
+                        mediaUrls={post.media_urls} 
+                        onPhotoClick={handlePhotoClick}
+                      />
+                    )}
+                    {(!post.media_urls || post.media_urls.length === 0) && post.image && (
+                      <div className="mt-4">
+                        <img
+                          src={post.image}
+                          alt="Post attachment"
+                          className="rounded-md max-h-96 w-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => handlePhotoClick(post.image!, 0, [post.image!])}
+                        />
+                      </div>
+                    )}
                     
                     <div className="mt-4 p-4 bg-amber-50 backdrop-blur-sm rounded-md">
                       <div className="flex items-center gap-3">
@@ -3624,13 +3731,13 @@ const SocialFeed = () => {
                   <CardContent className="pb-3">
                     <p className="whitespace-pre-line">{post.content}</p>
                     
-                    {post.type === "photo" && (post.media_urls && post.media_urls.length > 0) && (
+                    {(post.media_urls && post.media_urls.length > 0) && (
                       <MediaGallery 
                         mediaUrls={post.media_urls} 
                         onPhotoClick={handlePhotoClick}
                       />
                     )}
-                    {post.type === "photo" && (!post.media_urls || post.media_urls.length === 0) && post.image && (
+                    {(!post.media_urls || post.media_urls.length === 0) && post.image && (
                       <div className="mt-4">
                         <img
                           src={post.image}
@@ -3640,6 +3747,18 @@ const SocialFeed = () => {
                         />
                       </div>
                     )}
+                    
+                    <div className="mt-4 p-4 bg-pink-50 backdrop-blur-sm rounded-md">
+                      <div className="flex items-center gap-3">
+                        <Cake className="h-8 w-8 text-pink-500" />
+                        <div>
+                          <h3 className="font-medium">Happy Birthday! 🎉</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Celebrate with the team
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </CardContent>
                   <CardFooter className="flex items-center justify-evenly border-t pt-2 mt-2 gap-0 px-0">
                     {/* Like button with popover for all reactions */}
