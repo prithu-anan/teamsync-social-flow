@@ -18,6 +18,7 @@ import { searchUsers, searchProjects } from "@/utils/api/search-api";
 import { filterAndSortResults, quickFilter } from "@/utils/search-utils";
 import CreateTaskDialog from "@/components/CreateTaskDialog";
 import CreateProjectDialog from "@/components/CreateProjectDialog";
+import { getMe } from "@/utils/api/auth-api";
 
 interface SearchUser {
   id: string;
@@ -33,8 +34,9 @@ interface SearchProject {
 }
 
 const Header = () => {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const navigate = useNavigate();
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [allUsers, setAllUsers] = useState<SearchUser[]>([]);
   const [allProjects, setAllProjects] = useState<SearchProject[]>([]);
@@ -48,6 +50,24 @@ const Header = () => {
   const [createTaskDialogOpen, setCreateTaskDialogOpen] = useState(false);
   const [createProjectDialogOpen, setCreateProjectDialogOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
+
+  // Fetch current user
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      try {
+        const response = await getMe();
+        if (response.error) {
+          console.error("Failed to fetch current user:", response.error);
+        } else {
+          setCurrentUser(response.data);
+        }
+      } catch (error) {
+        console.error("Error fetching current user:", error);
+      }
+    };
+
+    fetchCurrentUser();
+  }, []);
 
   // Load all users and projects once for client-side filtering
   useEffect(() => {
@@ -280,29 +300,29 @@ const Header = () => {
                 variant="ghost"
                 className="relative h-8 w-8 rounded-full"
               >
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={user?.avatar} alt={user ? user?.name : 'SD'} />
-                  <AvatarFallback>
-                    {user?.name
-                      ? user.name.split(" ").map((n) => n[0]).join("")
-                      : "S"}
-                  </AvatarFallback>
-                </Avatar>
+                                 <Avatar className="h-8 w-8">
+                   <AvatarImage src={currentUser?.profilePicture} alt={currentUser ? currentUser?.name : 'SD'} />
+                   <AvatarFallback>
+                     {currentUser?.name
+                       ? currentUser.name.split(" ").map((n) => n[0]).join("")
+                       : "S"}
+                   </AvatarFallback>
+                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" forceMount>
-              <DropdownMenuLabel className="font-normal">
-                <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">{user?.name}</p>
-                  <p className="text-xs leading-none text-muted-foreground">
-                    {user?.email}
-                  </p>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link to={`/profile/${user?.id}`}>Profile</Link>
-              </DropdownMenuItem>
+                         <DropdownMenuContent className="w-56" align="end" forceMount>
+               <DropdownMenuLabel className="font-normal">
+                 <div className="flex flex-col space-y-1">
+                   <p className="text-sm font-medium leading-none">{currentUser?.name}</p>
+                   <p className="text-xs leading-none text-muted-foreground">
+                     {currentUser?.email}
+                   </p>
+                 </div>
+               </DropdownMenuLabel>
+               <DropdownMenuSeparator />
+               <DropdownMenuItem asChild>
+                 <Link to={`/profile/${currentUser?.id}`}>Profile</Link>
+               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link to="/settings">Settings</Link>
               </DropdownMenuItem>
