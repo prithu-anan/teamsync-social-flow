@@ -2,14 +2,14 @@
 
 ## Project info
 
-[Frontend](https://github.com/prithu-anan/teamsync-social-flow/)
-[Backend](https://github.com/suhashines/teamsync-backend)
-[Ai-Backend](https://github.com/suhashines/teamsync-ai-backend)
+[Frontend](https://github.com/prithu-anan/teamsync-social-flow/) \\
+[Backend](https://github.com/suhashines/teamsync-backend) \\
+[Ai-Backend](https://github.com/suhashines/teamsync-ai-backend) \\
 
 ## Project Demonstration
 
-[Features](https://youtu.be/6w2nb34J7IQ)
-[Infrastructure](https://youtu.be/2aUVb4ttsjM)
+[Features](https://youtu.be/6w2nb34J7IQ) \\
+[Infrastructure](https://youtu.be/2aUVb4ttsjM) \\
 
 ## Hosted Instance
 
@@ -39,7 +39,7 @@ docker compose up -d --build
 http://localhost:3000
 
 ## Run Backend
-[Follow this steps](https://github.com/suhashines/teamsync-backend/blob/master/README.md)
+[Follow these steps](https://github.com/suhashines/teamsync-backend/blob/master/README.md)
 
 ## Run Ai Backend
-[Follow this steps](https://github.com/suhashines/teamsync-ai-backend/blob/master/README.md)
+[Follow these steps](https://github.com/suhashines/teamsync-ai-backend/blob/master/README.md)
